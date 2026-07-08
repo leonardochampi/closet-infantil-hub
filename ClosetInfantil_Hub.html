@@ -405,31 +405,42 @@ function carregarBackup(input){
   const file = input.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const dados = JSON.parse(e.target.result);
       if(!dados.modulos) throw new Error('Arquivo inválido');
 
+      document.getElementById('backup-status').textContent = '⏳ Enviando dados para a nuvem...';
+
       let restaurados = 0;
+      const promises = [];
       BACKUP_KEYS.forEach(({ key }) => {
         if(dados.modulos[key] !== undefined){
-          _lsSet(key, dados.modulos[key]);
+          // Salvar no localStorage como cache
+          try{ localStorage.setItem(key, JSON.stringify(dados.modulos[key])); }catch(e){}
+          // Enviar ao Firebase se disponível
+          if(window.fsSet){
+            promises.push(window.fsSet(key, dados.modulos[key]));
+          }
           restaurados++;
         }
       });
+
+      // Aguardar todos os envios ao Firebase
+      if(promises.length) await Promise.all(promises);
 
       const dataBackup = dados.data
         ? new Date(dados.data).toLocaleString('pt-BR')
         : 'data desconhecida';
 
       document.getElementById('backup-status').textContent =
-        `✅ ${restaurados} módulo(s) restaurados · Backup de ${dataBackup} · Recarregando...`;
+        `✅ ${restaurados} módulo(s) restaurados na nuvem · Backup de ${dataBackup} · Recarregando...`;
 
-      setTimeout(()=>location.reload(), 1200);
+      setTimeout(()=>location.reload(), 1500);
 
     } catch(err) {
       document.getElementById('backup-status').textContent =
-        '❌ Erro ao carregar — verifique se o arquivo é um backup válido';
+        '❌ Erro ao carregar — verifique se o arquivo é um backup válido: ' + err.message;
     }
     input.value = '';
   };

@@ -497,40 +497,31 @@ footer{text-align:center;margin-top:36px;font-size:11px;color:var(--fe);font-fam
 
 <script>
 // ── FIREBASE SYNC LAYER ──────────────────────────────────────────────────────
-// Usa localStorage como cache instantâneo + sincroniza com Firestore em background
 const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
   'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
 
 function _lsGet(key, def) {
-  try{ const v=_lsGet(key, null); return v?JSON.parse(v):def; }catch(e){ return def; }
+  try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
 }
 function _lsSet(key, value) {
-  try{
-    _lsSet(key, value);
-    // Sincronizar com Firebase se disponível
-    if(window.fsSet && _fsKeys.includes(key)){
-      window.fsSet(key, value).catch(e=>console.warn('FS sync error:',key,e));
-    }
-  }catch(e){ console.error('_lsSet error:',e); }
+  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage error:',e); }
+  if(window.fsSet && _fsKeys.includes(key)){
+    try{
+      const safe = JSON.parse(JSON.stringify(value));
+      window.fsSet(key, safe).catch(e=>console.warn('FS sync:',key,e.message));
+    }catch(e){ console.warn('FS serialize error:',key,e.message); }
+  }
 }
-
-// Ao iniciar: puxar dados do Firebase e atualizar localStorage
-window._onFirebaseReady = async function() {
+window._onFirebaseReady = function() {
   if(window._fsInitDone) return;
   window._fsInitDone = true;
-  try {
-    // Escutar mudanças em tempo real para cada chave
-    _fsKeys.forEach(key => {
-      window.fsListen(key, value => {
-        if(value === null) return;
-        const local = _lsGet(key, null);
-        // Usar Firebase como fonte de verdade
-        _lsSet(key, value);
-        // Notificar módulo que dados foram atualizados
-        if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
-      });
+  _fsKeys.forEach(key => {
+    window.fsListen(key, value => {
+      if(value === null) return;
+      try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+      if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
     });
-  } catch(e) { console.warn('Firebase init error:', e); }
+  });
 };
 // ─────────────────────────────────────────────────────────────────────────────
 

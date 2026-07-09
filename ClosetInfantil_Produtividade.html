@@ -74,11 +74,16 @@ h1{font-family:Georgia,serif;font-size:clamp(18px,3vw,24px);color:var(--ch)}
   <div class="filtros">
     <label>Período:</label>
     <select id="fil-periodo" onchange="render()">
-      <option value="90">Últimos 90 dias</option>
-      <option value="60">Últimos 60 dias</option>
       <option value="30">Últimos 30 dias</option>
-      <option value="0">Todos</option>
+      <option value="60">Últimos 60 dias</option>
+      <option value="90" selected>Últimos 90 dias</option>
+      <option value="custom">Selecionar período</option>
     </select>
+    <div id="custom-periodo" style="display:none;gap:8px;align-items:center;display:none">
+      <input type="date" id="fil-de" onchange="render()" style="padding:7px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:12px;color:var(--ch)"/>
+      <span style="font-size:12px;color:var(--ch2)">até</span>
+      <input type="date" id="fil-ate" onchange="render()" style="padding:7px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:12px;color:var(--ch)"/>
+    </div>
     <label>Etapa:</label>
     <select id="fil-etapa" onchange="render()">
       <option value="">Todas as etapas</option>
@@ -168,10 +173,8 @@ async function init(){
   render();
 }
 
-function getLotes(tercNome, etapaFil, diasFil){
+function getLotes(tercNome, etapaFil, dataInicio, dataFim){
   const lotes = [];
-  const hoje = new Date();
-  const limite = diasFil > 0 ? new Date(hoje - diasFil*24*60*60*1000) : null;
 
   _ordens.forEach(op => {
     const grade = op.grade||{};
@@ -184,7 +187,9 @@ function getLotes(tercNome, etapaFil, diasFil){
       if(!etapaFil || etapaFil==='talh') {
         const dias = diffDias(talh.data_envio, talh.data_retorno_real);
         const retorno = talh.data_retorno_real ? new Date(talh.data_retorno_real+'T00:00:00') : null;
-        if((!limite || !retorno || retorno >= limite) && talh.status) {
+        const dentroRange = (!dataInicio || !retorno || retorno >= dataInicio) &&
+                            (!dataFim   || !retorno || retorno <= dataFim);
+        if(dentroRange && talh.status) {
           lotes.push({
             cod: op.cod, produto: op.produto, etapa: 'Talhação',
             envio: talh.data_envio, retorno: talh.data_retorno_real,
@@ -201,7 +206,9 @@ function getLotes(tercNome, etapaFil, diasFil){
       if(etapaFil && e.id !== etapaFil) return;
       const dias = diffDias(e.data_envio, e.data_retorno_real);
       const retorno = e.data_retorno_real ? new Date(e.data_retorno_real+'T00:00:00') : null;
-      if(limite && retorno && retorno < limite) return;
+      const dentroRange = (!dataInicio || !retorno || retorno >= dataInicio) &&
+                          (!dataFim   || !retorno || retorno <= dataFim);
+      if(!dentroRange) return;
       if(!e.data_envio && !e.data_retorno_real) return;
       lotes.push({
         cod: op.cod, produto: op.produto, etapa: ETAPA_LABELS[e.id]||e.id,
@@ -257,8 +264,29 @@ function trendIcon(t){
 }
 
 function render(){
+  const periodoSel = document.getElementById('fil-periodo').value;
+  const customDiv = document.getElementById('custom-periodo');
+  
+  // Mostrar/esconder seletor de datas
+  if(periodoSel === 'custom'){
+    customDiv.style.display = 'flex';
+  } else {
+    customDiv.style.display = 'none';
+  }
+  
   const etapaFil = document.getElementById('fil-etapa').value;
-  const diasFil  = parseInt(document.getElementById('fil-periodo').value)||0;
+  
+  // Calcular limite de datas
+  let dataInicio = null, dataFim = null;
+  if(periodoSel === 'custom'){
+    const de  = document.getElementById('fil-de').value;
+    const ate = document.getElementById('fil-ate').value;
+    if(de)  dataInicio = new Date(de+'T00:00:00');
+    if(ate) dataFim    = new Date(ate+'T23:59:59');
+  } else {
+    const dias = parseInt(periodoSel)||90;
+    dataInicio = new Date(new Date() - dias*24*60*60*1000);
+  }
 
   if(!_tercs.length){
     document.getElementById('grid-wrap').innerHTML = '<div class="empty">Nenhum terceirizado cadastrado.</div>';
@@ -269,7 +297,7 @@ function render(){
   let algum = false;
 
   _tercs.forEach(t => {
-    const lotes = getLotes(t.nome, etapaFil, diasFil);
+    const lotes = getLotes(t.nome, etapaFil, dataInicio, dataFim);
     if(!lotes.length) return;
     algum = true;
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
   <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="Closet Hub"/>
@@ -181,6 +181,28 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
   .pr-assin-line{width:100px;border-bottom:1px solid #4A3524;margin-bottom:3px;height:18px}
 }
 
+  /* ── MOBILE NAVEGAÇÃO TIPO APP ──────────────────────────────────────────────── */
+  #mobile-back-btn{display:none}
+  @media(max-width:768px){
+    /* Modo lista: lista ocupa tela toda, form escondido */
+    .layout{grid-template-columns:1fr!important;gap:0}
+    .col-lista{display:block}
+    .form-card{display:none}
+    /* Modo detalhe: form ocupa tela toda, lista escondida */
+    body.modo-detalhe .col-lista{display:none!important}
+    body.modo-detalhe .form-card{display:block!important}
+    body.modo-detalhe #mobile-back-btn{display:flex!important}
+    /* Botão voltar mobile */
+    #mobile-back-btn{
+      position:sticky;top:0;z-index:100;background:var(--pa);
+      padding:10px 16px;border-bottom:1px solid var(--fe2);
+      align-items:center;gap:10px;cursor:pointer;
+      font-size:13px;font-weight:600;color:var(--fe);
+    }
+    #mobile-back-btn svg{flex-shrink:0}
+    /* Filtro de status */
+    #filtro-status{margin-bottom:10px;width:100%;padding:8px 12px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:13px;color:var(--ch);background:var(--wh)}
+  }
   /* ── MOBILE RESPONSIVO ─────────────────────────────────────────────────────── */
   @media(max-width:768px){
     .wrap{padding:0 12px}
@@ -265,11 +287,23 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
 
   <div class="layout">
     <div class="painel">
-      <div class="painel-title">Ordens abertas <span class="badge-count" id="badge-count">0</span></div>
+      <div class="painel-title">Ordens de Produção <span class="badge-count" id="badge-count">0</span></div>
       <button class="btn-nova" onclick="novaOrdem()">+ Nova ordem</button>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select id="filtro-status" onchange="renderLista()" style="flex:0 0 auto;width:90px;padding:6px 8px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:11px;color:var(--ch);background:var(--wh)">
+          <option value="abertas">Abertas</option>
+          <option value="todas">Todas</option>
+          <option value="concluidas">Concluídas</option>
+        </select>
+        <input type="text" id="busca-op" oninput="renderLista()" placeholder="Buscar..." style="flex:1;padding:6px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:11px;color:var(--ch);background:var(--wh)"/>
+      </div>
       <div id="lista-ordens"><div class="empty-state">Nenhuma ordem criada.<br>Clique em "+ Nova ordem".</div></div>
     </div>
     <div class="form-card" id="form-wrap">
+      <div id="mobile-back-btn" onclick="voltarLista()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        <span>← Voltar para lista</span>
+      </div>
       <div style="text-align:center;padding:60px 0;color:var(--fe);font-family:'Fraunces',serif;font-style:italic;font-size:15px">Selecione uma ordem ou crie uma nova</div>
     </div>
   </div>
@@ -368,13 +402,15 @@ function novaOrdem(){
   ordemAtiva = 0;
   renderLista();
   renderForm();
+  abrirDetalhe();
 }
 
 function selecionarOrdem(idx){
   ordemAtiva = idx;
   renderLista();
   renderForm();
-  document.getElementById('form-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+  abrirDetalhe();
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 // ── SALVAR ────────────────────────────────────────────────────────────────────
@@ -908,12 +944,50 @@ function toggleImprimir(ei, ev){
   }
 }
 
-// ── RENDER LISTA ──────────────────────────────────────────────────────────────
+// ── MOBILE NAVIGATION ────────────────────────────────────────────────────────
+function isMobile(){ return window.innerWidth <= 768; }
+
+function abrirDetalhe(){
+  if(isMobile()) document.body.classList.add('modo-detalhe');
+}
+function voltarLista(){
+  document.body.classList.remove('modo-detalhe');
+}
+
+// ── FILTRO DE STATUS ──────────────────────────────────────────────────────────
+function getFiltroStatus(){
+  const el = document.getElementById('filtro-status');
+  return el ? el.value : 'abertas';
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderLista(){
   const el = document.getElementById('lista-ordens');
+  const filtro = getFiltroStatus();
+  const busca = (document.getElementById('busca-op')?.value||'').toLowerCase();
+  
+  // Badge mostra sempre abertas
   document.getElementById('badge-count').textContent = ordens.filter(o=>!o.concluida).length;
+  
   if(!ordens.length){ el.innerHTML='<div class="empty-state">Nenhuma ordem.<br>Clique em "+ Nova ordem".</div>'; return; }
-  const lista = ordens.map((o,i)=>({...o,_i:i})).sort((a,b)=>(a.concluida?1:0)-(b.concluida?1:0));
+  
+  let lista = ordens.map((o,i)=>({...o,_i:i}));
+  
+  // Filtrar por status
+  if(filtro==='abertas')    lista = lista.filter(o=>!o.concluida);
+  if(filtro==='concluidas') lista = lista.filter(o=>o.concluida);
+  
+  // Filtrar por busca
+  if(busca) lista = lista.filter(o=>
+    (o.produto||'').toLowerCase().includes(busca) ||
+    (o.cod||'').toLowerCase().includes(busca)
+  );
+  
+  if(!lista.length){
+    el.innerHTML=`<div class="empty-state">Nenhuma ordem ${filtro==='concluidas'?'concluída':filtro==='abertas'?'aberta':''} encontrada.</div>`;
+    return;
+  }
+  
   el.innerHTML = lista.map(o => {
     const prog = progresso(o);
     const total = totalGrade(o.grade);

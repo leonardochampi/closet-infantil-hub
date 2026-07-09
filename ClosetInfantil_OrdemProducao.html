@@ -948,7 +948,7 @@ function toggleImprimir(ei, ev){
 function isMobile(){ return window.innerWidth <= 768; }
 
 function abrirDetalhe(){
-  if(isMobile()) document.body.classList.add('modo-detalhe');
+  document.body.classList.add('modo-detalhe');
 }
 function voltarLista(){
   document.body.classList.remove('modo-detalhe');

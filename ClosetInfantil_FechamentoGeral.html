@@ -2,7 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Closet Hub"/>
+  <meta name="theme-color" content="#4A3524"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Closet Infantil — Fechamento Geral</title>
 <style>
 :root{
@@ -73,7 +79,38 @@ header{padding:28px 0 20px;display:flex;align-items:center;justify-content:space
   .pr-total-geral-valor{font-family:Georgia,serif;font-size:18pt;font-weight:700;color:#4A3524}
   .pr-footer{margin-top:12px;border-top:1px solid #D4B898;padding-top:6px;font-size:7pt;color:#B5916B;display:flex;justify-content:space-between}
 }
-</style>
+
+  /* ── MOBILE RESPONSIVO ─────────────────────────────────────────────────────── */
+  @media(max-width:768px){
+    .wrap{padding:0 12px}
+    header{padding:16px 0 12px;gap:8px}
+    header img{height:38px!important}
+    h1,.header-title{font-size:16px!important}
+    .btn-back{font-size:11px;padding:5px 10px}
+    .modules{grid-template-columns:1fr 1fr!important}
+    .mod-name{font-size:13px}
+    .mod-desc{display:none}
+    .mod-tag{font-size:9px}
+    .grid{grid-template-columns:1fr!important}
+    .terc-card,.card{border-radius:14px}
+    .kpi-val{font-size:18px!important}
+    .filtros{gap:6px}
+    .filtros select,.filtros input[type=date]{font-size:12px;padding:7px 10px}
+    table{font-size:11px}
+    th,td{padding:6px 8px!important}
+    .total-geral{padding:16px!important;border-radius:14px}
+    .total-geral-valor{font-size:24px!important}
+    #backup-bar{padding:10px 12px;flex-wrap:wrap;gap:8px}
+    .btn-bkp{font-size:11px;padding:6px 12px}
+    /* Tela login */
+    .card{padding:28px 20px!important;margin:16px}
+  }
+  @media(max-width:480px){
+    .modules{grid-template-columns:1fr!important}
+    .kpi-row{flex-wrap:wrap}
+    .kpi{min-width:45%}
+  }
+  </style>
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -556,5 +593,14 @@ document.addEventListener('DOMContentLoaded', function(){
   renderDashboard();
 });
 </script>
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(r=>console.log('SW registrado'))
+          .catch(e=>console.log('SW erro:',e));
+      });
+    }
+  </script>
 </body>
 </html>

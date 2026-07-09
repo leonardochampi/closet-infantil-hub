@@ -2,7 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Closet Hub"/>
+  <meta name="theme-color" content="#4A3524"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Closet Infantil — Login</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -20,7 +26,38 @@ input:focus{border-color:#B5916B}
 button{width:100%;padding:13px;background:#4A3524;color:#FAEFDA;border:none;border-radius:12px;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s}
 button:hover{background:#6B4F38}
 .erro{color:#991B1B;font-size:12px;margin-top:10px;min-height:18px}
-</style>
+
+  /* ── MOBILE RESPONSIVO ─────────────────────────────────────────────────────── */
+  @media(max-width:768px){
+    .wrap{padding:0 12px}
+    header{padding:16px 0 12px;gap:8px}
+    header img{height:38px!important}
+    h1,.header-title{font-size:16px!important}
+    .btn-back{font-size:11px;padding:5px 10px}
+    .modules{grid-template-columns:1fr 1fr!important}
+    .mod-name{font-size:13px}
+    .mod-desc{display:none}
+    .mod-tag{font-size:9px}
+    .grid{grid-template-columns:1fr!important}
+    .terc-card,.card{border-radius:14px}
+    .kpi-val{font-size:18px!important}
+    .filtros{gap:6px}
+    .filtros select,.filtros input[type=date]{font-size:12px;padding:7px 10px}
+    table{font-size:11px}
+    th,td{padding:6px 8px!important}
+    .total-geral{padding:16px!important;border-radius:14px}
+    .total-geral-valor{font-size:24px!important}
+    #backup-bar{padding:10px 12px;flex-wrap:wrap;gap:8px}
+    .btn-bkp{font-size:11px;padding:6px 12px}
+    /* Tela login */
+    .card{padding:28px 20px!important;margin:16px}
+  }
+  @media(max-width:480px){
+    .modules{grid-template-columns:1fr!important}
+    .kpi-row{flex-wrap:wrap}
+    .kpi{min-width:45%}
+  }
+  </style>
 </head>
 <body>
 <div class="card">
@@ -88,5 +125,14 @@ document.getElementById('senha').addEventListener('keydown', e => {
   if(e.key==='Enter') document.getElementById('btn-login').click();
 });
 </script>
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(r=>console.log('SW registrado'))
+          .catch(e=>console.log('SW erro:',e));
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+{
+  "name": "Closet Infantil Hub",
+  "short_name": "Closet Hub",
+  "description": "Hub Operacional Closet Infantil Store",
+  "start_url": "/closet-infantil-hub/",
+  "scope": "/closet-infantil-hub/",
+  "display": "standalone",
+  "background_color": "#FAEFDA",
+  "theme_color": "#4A3524",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

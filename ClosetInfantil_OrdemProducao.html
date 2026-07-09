@@ -1149,9 +1149,12 @@ function imprimirOrdem(){
         const tb=tams.reduce((s,t)=>s+(ck[`body_${t}`]||0),0), ts=tams.reduce((s,t)=>s+(ck[`short_${t}`]||0),0);
         foot=`<td class="td-tam">Total</td><td>${total}</td><td>${tb||''}</td><td>${ts||''}</td>`;
       } else {
-        head=`<th class="th-tam">Tam.</th><th>Cortado</th><th class="th-check">✓ Costurado</th>`;
-        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${o.grade[t]||0}</td><td>${ck[`cos_${t}`]||''}</td></tr>`).join('');
-        const tc=tams.reduce((s,t)=>s+(ck[`cos_${t}`]||0),0);
+        const ehSup = o.tipo_peca==='body'||o.tipo_peca==='romper'||o.tipo_peca==='ciclista';
+        const labelCos = o.tipo_peca==='romper' ? '✓ Costurado' : o.tipo_peca==='ciclista' ? '✓ Costurado' : o.tipo_peca==='body' ? '✓ Costurado' : '✓ Costurado';
+        const ckKey = ehSup ? (t=>`body_${t}`) : (t=>`short_${t}`);
+        head=`<th class="th-tam">Tam.</th><th>Cortado</th><th class="th-check">${labelCos}</th>`;
+        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${o.grade[t]||0}</td><td>${ck[ckKey(t)]||''}</td></tr>`).join('');
+        const tc=tams.reduce((s,t)=>s+(parseInt(ck[ckKey(t)])||0),0);
         foot=`<td class="td-tam">Total</td><td>${total}</td><td>${tc||''}</td>`;
       }
     } else if(tipo==='conferencia'){

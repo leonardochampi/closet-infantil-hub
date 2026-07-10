@@ -437,15 +437,26 @@ const BACKUP_KEYS = [
   { key: 'ci_fechamentos',      label: 'Fechamentos' },
 ];
 
-function salvarBackup(){
+async function salvarBackup(){
+  const statusEl = document.getElementById('backup-status');
+  statusEl.textContent = '⏳ Preparando backup...';
+  
   const dados = { versao: '1.0', data: new Date().toISOString(), modulos: {} };
   let total = 0;
-  BACKUP_KEYS.forEach(({ key, label }) => {
+
+  for(const { key, label } of BACKUP_KEYS){
     try {
-      const val = _lsGet(key, null);
-      if(val){ dados.modulos[key] = JSON.parse(val); total++; }
+      // Tentar Firebase primeiro, fallback localStorage
+      let val = null;
+      if(window.fsGet){
+        val = await window.fsGet(key);
+      }
+      if(val === null){
+        val = _lsGet(key, null);
+      }
+      if(val !== null){ dados.modulos[key] = val; total++; }
     } catch(e) {}
-  });
+  }
 
   const json = JSON.stringify(dados, null, 2);
   const blob = new Blob([json], { type: 'application/json' });

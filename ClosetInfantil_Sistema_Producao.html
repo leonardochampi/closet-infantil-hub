@@ -358,21 +358,49 @@ footer{text-align:center;font-size:.68rem;color:var(--fe);padding:12px;font-styl
 const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
   'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
 
+// Fila de pendências — guarda o que precisa ser enviado ao Firebase
+const _fsPendentes = {};
+
 function _lsGet(key, def) {
   try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
 }
 function _lsSet(key, value) {
+  // 1. Salvar localStorage imediatamente
   try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage error:',e); }
-  if(window.fsSet && _fsKeys.includes(key)){
+  // 2. Tentar enviar ao Firebase
+  if(_fsKeys.includes(key)){
     try{
       const safe = JSON.parse(JSON.stringify(value));
-      window.fsSet(key, safe).catch(e=>console.warn('FS sync:',key,e.message));
+      if(window.fsSet){
+        // Firebase disponível — enviar agora
+        window.fsSet(key, safe).catch(e=>{
+          console.warn('FS sync falhou, guardando na fila:',key);
+          _fsPendentes[key] = safe;
+        });
+      } else {
+        // Firebase ainda não inicializou — guardar na fila
+        _fsPendentes[key] = safe;
+      }
     }catch(e){ console.warn('FS serialize error:',key,e.message); }
   }
 }
+
 window._onFirebaseReady = function() {
   if(window._fsInitDone) return;
   window._fsInitDone = true;
+
+  // Enviar tudo que ficou na fila enquanto Firebase não estava pronto
+  const pendentes = Object.keys(_fsPendentes);
+  if(pendentes.length > 0){
+    console.log('Enviando', pendentes.length, 'itens pendentes ao Firebase...');
+    pendentes.forEach(key => {
+      window.fsSet(key, _fsPendentes[key])
+        .then(()=>{ delete _fsPendentes[key]; })
+        .catch(e=>console.warn('Erro ao enviar pendente:',key,e.message));
+    });
+  }
+
+  // Escutar mudanças em tempo real
   _fsKeys.forEach(key => {
     window.fsListen(key, value => {
       if(value === null) return;

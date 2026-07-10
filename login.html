@@ -58,6 +58,17 @@ button:hover{background:#6B4F38}
     .kpi{min-width:45%}
   }
   </style>
+  <script>
+    // Fix iOS PWA — inputs não abriam teclado em modo standalone
+    document.addEventListener('touchend', function(e){
+      const el = e.target;
+      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'){
+        e.preventDefault();
+        el.focus();
+        if(el.tagName!=='SELECT') el.click();
+      }
+    }, {passive:false});
+  </script>
 </head>
 <body>
 <div class="card">

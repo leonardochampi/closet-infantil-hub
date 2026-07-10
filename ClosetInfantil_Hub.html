@@ -203,6 +203,17 @@ footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-fa
       if(typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
     });
   </script>
+  <script>
+    // Fix iOS PWA — inputs não abriam teclado em modo standalone
+    document.addEventListener('touchend', function(e){
+      const el = e.target;
+      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'){
+        e.preventDefault();
+        el.focus();
+        if(el.tagName!=='SELECT') el.click();
+      }
+    }, {passive:false});
+  </script>
 </head>
 <body>
 <div class="container">

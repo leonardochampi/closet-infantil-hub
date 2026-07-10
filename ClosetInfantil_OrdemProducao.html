@@ -464,7 +464,7 @@ function renderTalhacaoSection(talh){
   const sOk = tst==='concluido' ? ' selected' : '';
 
   return '<div class="cols-4">'
-    +'<div class="field"><label>Assinatura</label><div id="talh-forn-wrap"></div></div>'
+    +'<div class="field"><label>Responsável</label><div id="talh-forn-wrap"></div></div>'
     +'<div class="field"><label>Data de envio</label><input type="date" value="'+tEnv+'" onchange="salvarTalh(&apos;data_envio&apos;,this.value)"/></div>'
     +'<div class="field"><label>Data de entrega</label><input type="date" value="'+tEnt+'" onchange="salvarTalh(&apos;data_retorno_real&apos;,this.value)"/></div>'
     +'<div class="field"><label>Status</label>'+mkSel(sAg,sEm,sOk)+'</div>'

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'closet-hub-v1';
+const CACHE_NAME = 'closet-hub-v3';
 const URLS_TO_CACHE = [
   '/closet-infantil-hub/',
   '/closet-infantil-hub/index.html',
@@ -14,34 +14,52 @@ const URLS_TO_CACHE = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Ativa imediatamente sem esperar
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))
-    )
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim()) // Toma controle imediato
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  // Firebase requests: sempre network
-  if(event.request.url.includes('firebase') || event.request.url.includes('google')) {
+  // Firebase e APIs externas: sempre buscar da rede
+  if(event.request.url.includes('firebase') ||
+     event.request.url.includes('googleapis') ||
+     event.request.url.includes('gstatic')) {
     return;
   }
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Atualizar cache com versão nova
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
+
+  // Estratégia: network-first para HTMLs, cache-first para assets
+  const isHTML = event.request.url.endsWith('.html') || event.request.url.endsWith('/');
+  
+  if(isHTML) {
+    // Network first: sempre tenta pegar versão mais nova
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    // Cache first para imagens e outros assets
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        return cached || fetch(event.request).then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        });
       })
-      .catch(() => caches.match(event.request))
-  );
+    );
+  }
 });

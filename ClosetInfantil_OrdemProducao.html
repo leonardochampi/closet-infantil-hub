@@ -350,6 +350,15 @@ window._onFirebaseReady = function() {
     });
   });
 };
+
+// Recarregar dados quando Firebase sincronizar
+window._onDataUpdate = function(key) {
+  if(key === OP_KEY){
+    ordens = loadOrdens();
+    renderLista();
+    if(ordemAtiva !== null && ordens[ordemAtiva]) renderForm();
+  }
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const OP_KEY  = 'ci_ordens_producao';

@@ -255,6 +255,10 @@ window._onFirebaseReady = function() {
     });
   });
 };
+
+window._onDataUpdate = function(key) {
+  terceirizados = loadTerc(); renderMain();
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────

@@ -212,6 +212,10 @@ window._onFirebaseReady = function() {
     });
   });
 };
+
+window._onDataUpdate = function(key) {
+  renderDashboard();
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TERC_KEY = 'ci_terceirizados';

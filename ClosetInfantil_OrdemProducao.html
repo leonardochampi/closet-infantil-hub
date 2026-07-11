@@ -182,7 +182,15 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
 }
 
   /* ── MOBILE NAVEGAÇÃO TIPO APP ──────────────────────────────────────────────── */
-  #mobile-back-btn{display:none}
+  #mobile-back-btn{
+    display:none;
+    position:sticky;top:0;z-index:100;background:var(--pa);
+    padding:10px 16px;border-bottom:1px solid var(--fe2);
+    align-items:center;gap:10px;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--fe);
+    margin:-28px -28px 16px -28px;
+  }
+  #mobile-back-btn svg{flex-shrink:0}
   @media(max-width:768px){
     /* Modo lista: lista ocupa tela toda, form escondido */
     .layout{grid-template-columns:1fr!important;gap:0}
@@ -191,16 +199,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     /* Modo detalhe: form ocupa tela toda, lista escondida */
     body.modo-detalhe .col-lista{display:none!important}
     body.modo-detalhe .form-card{display:block!important}
-    body.modo-detalhe #mobile-back-btn{display:flex!important}
     body.modo-detalhe .btn-back{display:none!important}
-    /* Botão voltar mobile */
-    #mobile-back-btn{
-      position:sticky;top:0;z-index:100;background:var(--pa);
-      padding:10px 16px;border-bottom:1px solid var(--fe2);
-      align-items:center;gap:10px;cursor:pointer;
-      font-size:13px;font-weight:600;color:var(--fe);
-    }
-    #mobile-back-btn svg{flex-shrink:0}
     /* Filtro de status */
     #filtro-status{margin-bottom:10px;width:100%;padding:8px 12px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:13px;color:var(--ch);background:var(--wh)}
   }
@@ -314,7 +313,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     <div class="form-card" id="form-wrap">
       <div id="mobile-back-btn" onclick="voltarLista()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-        <span>← Voltar para lista</span>
+        <span>← Ordens de produção</span>
       </div>
       <div style="text-align:center;padding:60px 0;color:var(--fe);font-family:'Fraunces',serif;font-style:italic;font-size:15px">Selecione uma ordem ou crie uma nova</div>
     </div>
@@ -989,9 +988,14 @@ function isMobile(){ return window.innerWidth <= 768; }
 
 function abrirDetalhe(){
   document.body.classList.add('modo-detalhe');
+  // Garantir botão voltar visível no mobile
+  const btn = document.getElementById('mobile-back-btn');
+  if(btn) btn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
 }
 function voltarLista(){
   document.body.classList.remove('modo-detalhe');
+  const btn = document.getElementById('mobile-back-btn');
+  if(btn) btn.style.display = 'none';
 }
 
 // ── FILTRO DE STATUS ──────────────────────────────────────────────────────────

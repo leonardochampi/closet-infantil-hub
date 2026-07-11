@@ -192,6 +192,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     body.modo-detalhe .col-lista{display:none!important}
     body.modo-detalhe .form-card{display:block!important}
     body.modo-detalhe #mobile-back-btn{display:flex!important}
+    body.modo-detalhe .btn-back{display:none!important}
     /* Botão voltar mobile */
     #mobile-back-btn{
       position:sticky;top:0;z-index:100;background:var(--pa);
@@ -1442,7 +1443,27 @@ function imprimirOrdem(){
       </div>
     </div>
   `;
-  window.print();
+  // iOS/mobile: usar Web Share API ou abrir janela de impressão
+  const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobileDevice && navigator.share){
+    // Criar blob HTML para compartilhar como PDF pelo iOS
+    const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+      <title>OP ${o.cod||''} - ${o.produto||''}</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:12px;color:#333;margin:20px}
+        ${document.getElementById('print-styles')?.textContent||''}
+      </style></head><body>
+      ${document.getElementById('print-area').innerHTML}
+      </body></html>`;
+    const blob = new Blob([printHtml], {type:'text/html'});
+    const file = new File([blob], `OP_${o.cod||'ordem'}.html`, {type:'text/html'});
+    navigator.share({
+      title: `OP ${o.cod||''} - ${o.produto||''}`,
+      files: [file]
+    }).catch(()=> window.print());
+  } else {
+    window.print();
+  }
 }
 
 // ── FORNECEDORES (integração com Terceirizados) ──────────────────────────────

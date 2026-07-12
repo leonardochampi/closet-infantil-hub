@@ -1114,7 +1114,7 @@ function renderForm(){
         <div class="form-title">${o.produto||'Nova ordem'}</div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-print" onclick="imprimirOrdem()">🖨 Imprimir</button>
+        <button class="btn btn-print" onclick="imprimirOrdem()" id="btn-imprimir">🖨 Imprimir</button>
         <button class="btn ${o.concluida?'btn-ghost':'btn-primary'}" onclick="toggleConcluida()">${o.concluida?'↩ Reabrir':'✓ Concluir'}</button>
         <button class="btn btn-danger" onclick="excluirOrdem()">Excluir</button>
       </div>
@@ -1227,7 +1227,14 @@ function renderForm(){
     }
     for(let _i=0;_i<_eiCount;_i++) atualizarTotalCk(_i);
     // Pré-preparar área de impressão para clique instantâneo
-    setTimeout(()=>prepararImpressao(), 100);
+    setTimeout(()=>{
+      prepararImpressao();
+      // Ajustar label do botão por dispositivo
+      const btn = document.getElementById('btn-imprimir');
+      if(btn && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){
+        btn.innerHTML = '📄 Salvar PDF';
+      }
+    }, 100);
   }, 30);
 }
 
@@ -1244,7 +1251,28 @@ function toggleEtapa(ei){
 function imprimirOrdem(){
   if(ordemAtiva===null) return;
   prepararImpressao();
-  window.print();
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobile){
+    // Mobile: gerar PDF via blob e abrir para salvar
+    const o = ordens[ordemAtiva];
+    const printArea = document.getElementById('print-area');
+    const estilo = Array.from(document.styleSheets)
+      .filter(s=>{ try{ return s.cssRules; }catch(e){ return false; } })
+      .flatMap(s=>Array.from(s.cssRules))
+      .map(r=>r.cssText).join('\n');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+      <title>OP ${o.cod||''} - ${o.produto||''}</title>
+      <style>${estilo}</style></head><body>${printArea.innerHTML}</body></html>`;
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `OP_${o.cod||'ordem'}_${o.produto||''}.html`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  } else {
+    window.print();
+  }
 }
 
 function prepararImpressao(){

@@ -73,7 +73,9 @@ header{padding:28px 0 20px;display:flex;align-items:center;justify-content:space
 .cols-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .cols-4{display:flex;gap:10px}
 .cols-4 .field{flex:1;margin-bottom:0}
-@media(max-width:600px){.cols,.cols-3{grid-template-columns:1fr}.cols-4{flex-wrap:wrap}.cols-4 .field{min-width:calc(50% - 10px)}}
+.cols-5{display:flex;gap:10px}
+.cols-5 .field{flex:1;margin-bottom:0}
+@media(max-width:600px){.cols,.cols-3{grid-template-columns:1fr}.cols-4{flex-wrap:wrap}.cols-4 .field{min-width:calc(50% - 10px)}.cols-5{flex-wrap:wrap}.cols-5 .field{min-width:calc(50% - 10px)}}
 .lote-badge{display:inline-flex;align-items:center;gap:8px;background:var(--pa2);border:1.5px solid var(--fe2);border-radius:var(--r-sm);padding:8px 14px;font-size:13px;font-weight:700;color:var(--ch);font-family:'Fraunces',serif;letter-spacing:1px}
 .prog-bar-wrap{background:var(--pa2);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:18px}
 .prog-label{font-size:10px;color:var(--ch2);font-weight:500;margin-bottom:5px;display:flex;justify-content:space-between}
@@ -1082,7 +1084,7 @@ function renderForm(){
           <button class="st-btn${e.status==='em_producao'?' on-em':''}" id="stbtn-${ei}-em" onclick="setStatus(${ei},'em_producao')">🔧 Em produção</button>
           <button class="st-btn${e.status==='concluido'?' on-ok':''}" id="stbtn-${ei}-ok" onclick="setStatus(${ei},'concluido')">✅ Concluído</button>
         </div>
-        <div class="cols-4">
+        <div class="cols-5">
           <div class="field"><label>Fornecedor</label>
             <div id="forn-wrap-${ei}"></div>
           </div>

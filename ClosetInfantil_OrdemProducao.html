@@ -191,6 +191,8 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     margin:-28px -28px 16px -28px;
   }
   #mobile-back-btn svg{flex-shrink:0}
+  /* btn-voltar-lista: escondido por padrão */
+  #btn-voltar-lista{display:none!important}
   @media(max-width:768px){
     /* Modo lista: lista ocupa tela toda, form escondido */
     .layout{grid-template-columns:1fr!important;gap:0}
@@ -199,7 +201,8 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     /* Modo detalhe: form ocupa tela toda, lista escondida */
     body.modo-detalhe .col-lista{display:none!important}
     body.modo-detalhe .form-card{display:block!important}
-    body.modo-detalhe .btn-back{display:none!important}
+    body.modo-detalhe #btn-hub{display:none!important}
+    body.modo-detalhe #btn-voltar-lista{display:flex!important}
     /* Filtro de status */
     #filtro-status{margin-bottom:10px;width:100%;padding:8px 12px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:13px;color:var(--ch);background:var(--wh)}
   }
@@ -989,22 +992,11 @@ function isMobile(){ return window.innerWidth <= 768; }
 
 function abrirDetalhe(){
   document.body.classList.add('modo-detalhe');
-  if(window.innerWidth <= 768){
-    const btnHub = document.getElementById('btn-hub');
-    const btnVoltar = document.getElementById('btn-voltar-lista');
-    if(btnHub) btnHub.style.display = 'none';
-    if(btnVoltar) btnVoltar.style.display = 'flex';
-  }
+  window.scrollTo({top:0});
 }
 function voltarLista(){
   document.body.classList.remove('modo-detalhe');
-  const btnHub = document.getElementById('btn-hub');
-  const btnVoltar = document.getElementById('btn-voltar-lista');
-  if(btnHub) btnHub.style.display = '';
-  if(btnVoltar) btnVoltar.style.display = 'none';
-  // Esconder também o mobile-back-btn interno
-  const mobileBtn = document.getElementById('mobile-back-btn');
-  if(mobileBtn) mobileBtn.style.display = 'none';
+  window.scrollTo({top:0});
 }
 
 // ── FILTRO DE STATUS ──────────────────────────────────────────────────────────
@@ -1456,27 +1448,8 @@ function imprimirOrdem(){
       </div>
     </div>
   `;
-  // iOS/mobile: usar Web Share API ou abrir janela de impressão
-  const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(isMobileDevice && navigator.share){
-    // Criar blob HTML para compartilhar como PDF pelo iOS
-    const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-      <title>OP ${o.cod||''} - ${o.produto||''}</title>
-      <style>
-        body{font-family:Arial,sans-serif;font-size:12px;color:#333;margin:20px}
-        ${document.getElementById('print-styles')?.textContent||''}
-      </style></head><body>
-      ${document.getElementById('print-area').innerHTML}
-      </body></html>`;
-    const blob = new Blob([printHtml], {type:'text/html'});
-    const file = new File([blob], `OP_${o.cod||'ordem'}.html`, {type:'text/html'});
-    navigator.share({
-      title: `OP ${o.cod||''} - ${o.produto||''}`,
-      files: [file]
-    }).catch(()=> window.print());
-  } else {
-    window.print();
-  }
+  // Disparar impressão — no iOS Safari abre menu com opção "Salvar como PDF"
+  window.print();
 }
 
 // ── FORNECEDORES (integração com Terceirizados) ──────────────────────────────

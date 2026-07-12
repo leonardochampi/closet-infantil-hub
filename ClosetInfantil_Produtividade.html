@@ -297,8 +297,9 @@ function getLotes(tercNome, etapaFil, dataInicio, dataFim){
       lotes.push({
         cod: op.cod, produto: op.produto, etapa: ETAPA_LABELS[e.id]||e.id,
         envio: e.data_envio, inicio: e.data_inicio, retorno: e.data_retorno_real,
-        // Leadtime: data_inicio → retorno (se disponível), senão data_envio → retorno
         dias: e.data_inicio ? diffDias(e.data_inicio, e.data_retorno_real) : diffDias(e.data_envio, e.data_retorno_real),
+        total,
+        ppcdia: null,
         status: e.status
       });
       // Calcular ppcdia após ter dias

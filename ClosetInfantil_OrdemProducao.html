@@ -1226,6 +1226,8 @@ function renderForm(){
       if(mw){ const et=o.etapas[_i]; mw.innerHTML=renderMesEtapaSelect(_i,et.mes_fechamento||''); }
     }
     for(let _i=0;_i<_eiCount;_i++) atualizarTotalCk(_i);
+    // Pré-preparar área de impressão para clique instantâneo
+    setTimeout(()=>prepararImpressao(), 100);
   }, 30);
 }
 
@@ -1241,6 +1243,12 @@ function toggleEtapa(ei){
 // ── IMPRIMIR ──────────────────────────────────────────────────────────────────
 function imprimirOrdem(){
   if(ordemAtiva===null) return;
+  prepararImpressao();
+  window.print();
+}
+
+function prepararImpressao(){
+  if(ordemAtiva===null) return;
   // Coletar valores atuais dos inputs da grade diretamente do DOM
   const gradeInputs = document.querySelectorAll('[id^="gq-"]');
   gradeInputs.forEach(inp => {
@@ -1254,7 +1262,7 @@ function imprimirOrdem(){
   const estadosAbertos = [];
   etapaBodies.forEach((b,i) => {
     estadosAbertos.push(b.classList.contains('open'));
-    b.style.display = 'block'; // forçar visível sem alterar a classe
+    b.style.display = 'block';
   });
   // Ler todos os inputs de checklist do DOM e salvar no objeto antes de imprimir
   document.querySelectorAll('.ck-table input[type="number"]').forEach(inp => {
@@ -1275,7 +1283,6 @@ function imprimirOrdem(){
     b.style.display = estadosAbertos[i] ? 'block' : '';
   });
   saveOrdens(ordens);
-  // Recarregar para garantir dados frescos
   ordens = loadOrdens();
   const o = ordens[ordemAtiva];
   const tams = o.grade_tamanhos||[];
@@ -1448,8 +1455,8 @@ function imprimirOrdem(){
       </div>
     </div>
   `;
-  // Disparar impressão — no iOS Safari abre menu com opção "Salvar como PDF"
-  window.print();
+  // Pequeno delay para o browser renderizar antes de imprimir
+  setTimeout(() => window.print(), 100);
 }
 
 // ── FORNECEDORES (integração com Terceirizados) ──────────────────────────────

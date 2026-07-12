@@ -1087,6 +1087,7 @@ function renderForm(){
             <div id="forn-wrap-${ei}"></div>
           </div>
           <div class="field"><label>Data de envio</label><input type="date" value="${e.data_envio||''}" oninput="salvarEtapa(${ei},'data_envio',this.value)"/></div>
+          <div class="field"><label>Data de início</label><input type="date" value="${e.data_inicio||''}" oninput="salvarEtapa(${ei},'data_inicio',this.value)"/></div>
           <div class="field"><label>Data de entrega</label><input type="date" value="${e.data_retorno_real||''}" oninput="salvarEtapa(${ei},'data_retorno_real',this.value)"/></div>
           <div class="field"><label>Assinatura</label><input type="text" value="${e.assinatura_nome||''}" placeholder="Nome do profissional" oninput="salvarEtapa(${ei},'assinatura_nome',this.value)"/></div>
         </div>
@@ -1415,6 +1416,7 @@ function prepararImpressao(){
       <div class="pr-datas">
         <div><div class="pr-field-label">Fornecedor</div><div class="pr-field-val">${e.fornecedor||''}</div></div>
         <div><div class="pr-field-label">Data de envio</div><div class="pr-field-val">${fmtData(e.data_envio)}</div></div>
+        <div><div class="pr-field-label">Data de início</div><div class="pr-field-val">${fmtData(e.data_inicio)}</div></div>
         <div><div class="pr-field-label">Data de entrega</div><div class="pr-field-val">${fmtData(e.data_retorno_real)}</div></div>
         <div><div class="pr-field-label">Fechamento</div><div class="pr-field-val">${e.mes_fechamento?_MESES_LABEL[parseInt(e.mes_fechamento.split('-')[1])-1]+'/'+e.mes_fechamento.split('-')[0].slice(2):'—'}</div></div>
         <div><div class="pr-field-label">Assinatura</div><div class="pr-field-val" style="border-bottom:1px solid #D4B898">${e.assinatura_nome||''}</div></div>

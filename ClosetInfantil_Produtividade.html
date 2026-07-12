@@ -296,10 +296,14 @@ function getLotes(tercNome, etapaFil, dataInicio, dataFim){
       if(!e.data_envio && !e.data_retorno_real) return;
       lotes.push({
         cod: op.cod, produto: op.produto, etapa: ETAPA_LABELS[e.id]||e.id,
-        envio: e.data_envio, retorno: e.data_retorno_real,
-        dias, total, ppcdia: dias>0 ? Math.round(total/dias) : null,
+        envio: e.data_envio, inicio: e.data_inicio, retorno: e.data_retorno_real,
+        // Leadtime: data_inicio → retorno (se disponível), senão data_envio → retorno
+        dias: e.data_inicio ? diffDias(e.data_inicio, e.data_retorno_real) : diffDias(e.data_envio, e.data_retorno_real),
         status: e.status
       });
+      // Calcular ppcdia após ter dias
+      const ultimo = lotes[lotes.length-1];
+      if(ultimo) ultimo.ppcdia = ultimo.dias>0 ? Math.round(ultimo.total/ultimo.dias) : null;
     });
   });
 
@@ -454,7 +458,7 @@ function render(){
 
       html += `<div style="overflow-x:auto"><table class="lotes-table">
         <thead><tr>
-          <th>Ordem</th><th>Etapa</th><th>Envio</th><th>Retorno</th>
+          <th>Ordem</th><th>Etapa</th><th>Envio</th><th>Início</th><th>Entrega</th>
           <th class="r">Dias</th><th class="r">Peças</th><th class="r">Pç/dia</th>
         </tr></thead><tbody>`;
 
@@ -466,6 +470,7 @@ function render(){
           <td style="font-weight:600;white-space:nowrap;font-size:11px">${l.cod}</td>
           <td style="font-size:11px">${l.etapa}</td>
           <td style="font-size:11px;white-space:nowrap">${fmtData(l.envio)}</td>
+          <td style="font-size:11px;white-space:nowrap">${l.inicio?fmtData(l.inicio):'<span style="color:var(--fe2)">—</span>'}</td>
           <td style="font-size:11px;white-space:nowrap">${l.retorno?fmtData(l.retorno):'<span style="color:var(--am)">Em andamento</span>'}</td>
           <td class="r" style="${cor}">${diasStr}</td>
           <td class="r">${l.total.toLocaleString('pt-BR')}</td>

@@ -238,7 +238,15 @@ function fmt0(n){ return Math.round(parseFloat(n)||0); }
 function diffDias(d1, d2){
   if(!d1||!d2) return null;
   const a=new Date(d1+'T00:00:00'), b=new Date(d2+'T00:00:00');
-  return Math.round((b-a)/(1000*60*60*24));
+  if(b<=a) return 0;
+  let uteis = 0;
+  const cur = new Date(a);
+  while(cur < b){
+    cur.setDate(cur.getDate()+1);
+    const dow = cur.getDay();
+    if(dow!==0 && dow!==6) uteis++; // ignora sábado(6) e domingo(0)
+  }
+  return uteis;
 }
 
 async function init(){

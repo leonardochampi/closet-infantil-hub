@@ -1417,23 +1417,38 @@ function prepararImpressao(){
 
 // ── RETORNOS PARCIAIS ──────────────────────────────────────────────────────────
 function renderRetornosParciais(ei, retornos){
+  const o = ordens[ordemAtiva];
+  const tams = o.grade_tamanhos||[];
   if(!retornos.length) return '<div style="font-size:11px;color:var(--fe2);font-style:italic;padding:4px 0">Nenhum retorno registrado.</div>';
-  return retornos.map((r,ri)=>`
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;background:var(--pa2);border-radius:var(--r-sm);padding:8px 10px">
-      <div class="field" style="flex:1;min-width:120px;margin:0">
-        <label style="font-size:10px">Data do retorno</label>
-        <input type="date" value="${r.data||''}" oninput="salvarRetornoParcial(${ei},${ri},'data',this.value)" style="padding:6px 8px;font-size:12px"/>
+  return retornos.map((r,ri)=>{
+    const qtdTot = tams.reduce((s,t)=>s+(parseInt(r.qtd_tam?.[t]||0)),0);
+    return `
+    <div style="background:var(--pa2);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
+        <div class="field" style="flex:1;min-width:120px;margin:0">
+          <label style="font-size:10px">Data do retorno</label>
+          <input type="date" value="${r.data||''}" oninput="salvarRetornoParcial(${ei},${ri},'data',this.value)" style="padding:6px 8px;font-size:12px"/>
+        </div>
+        <div class="field" style="flex:1;min-width:130px;margin:0">
+          <label style="font-size:10px">Mês de fechamento</label>
+          ${renderMesSelectParcial(ei, ri, r.mes||'')}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--ch);white-space:nowrap;padding-bottom:6px">
+          Total: ${qtdTot} pç
+        </div>
+        <button onclick="removerRetornoParcial(${ei},${ri})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;padding-bottom:4px">×</button>
       </div>
-      <div class="field" style="flex:0 0 100px;margin:0">
-        <label style="font-size:10px">Qtd peças</label>
-        <input type="number" value="${r.qtd||''}" min="0" placeholder="0" oninput="salvarRetornoParcial(${ei},${ri},'qtd',this.value)" style="padding:6px 8px;font-size:12px"/>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${tams.map(t=>`
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px">
+            <label style="font-size:10px;font-weight:600;color:var(--ch2)">${t}</label>
+            <input type="number" value="${r.qtd_tam?.[t]||''}" min="0" placeholder="0"
+              oninput="salvarRetornoParcialTam(${ei},${ri},'${t}',this.value)"
+              style="width:52px;padding:5px 6px;font-size:12px;text-align:center;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif"/>
+          </div>`).join('')}
       </div>
-      <div class="field" style="flex:1;min-width:130px;margin:0">
-        <label style="font-size:10px">Mês de fechamento</label>
-        ${renderMesSelectParcial(ei, ri, r.mes||'')}
-      </div>
-      <button onclick="removerRetornoParcial(${ei},${ri})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" title="Remover">×</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderMesSelectParcial(ei, ri, mesSel){
@@ -1451,18 +1466,36 @@ function renderMesSelectParcial(ei, ri, mesSel){
 function adicionarRetornoParcial(ei){
   const o = ordens[ordemAtiva];
   if(!o.etapas[ei].retornos_parciais) o.etapas[ei].retornos_parciais = [];
-  o.etapas[ei].retornos_parciais.push({data:'', qtd:'', mes:''});
+  o.etapas[ei].retornos_parciais.push({data:'', mes:'', qtd_tam:{}});
   saveOrdens(ordens);
-  document.getElementById('retornos-wrap-'+ei).innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
-  // Atualizar totalizador
   renderForm();
 }
 
 function salvarRetornoParcial(ei, ri, campo, valor){
   const o = ordens[ordemAtiva];
   if(!o.etapas[ei].retornos_parciais) return;
-  o.etapas[ei].retornos_parciais[ri][campo] = campo==='qtd' ? (parseInt(valor)||0) : valor;
+  o.etapas[ei].retornos_parciais[ri][campo] = valor;
+  // Recalcular qtd total como soma dos tamanhos
+  const r = o.etapas[ei].retornos_parciais[ri];
+  const tams = o.grade_tamanhos||[];
+  r.qtd = tams.reduce((s,t)=>s+(parseInt(r.qtd_tam?.[t]||0)),0);
   saveOrdens(ordens);
+  // Atualizar só o totalizador sem re-renderizar tudo
+  const wrap = document.getElementById('retornos-wrap-'+ei);
+  if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
+}
+
+function salvarRetornoParcialTam(ei, ri, tam, valor){
+  const o = ordens[ordemAtiva];
+  if(!o.etapas[ei].retornos_parciais) return;
+  const r = o.etapas[ei].retornos_parciais[ri];
+  if(!r.qtd_tam) r.qtd_tam = {};
+  r.qtd_tam[tam] = parseInt(valor)||0;
+  r.qtd = (o.grade_tamanhos||[]).reduce((s,t)=>s+(parseInt(r.qtd_tam?.[t]||0)),0);
+  saveOrdens(ordens);
+  // Atualizar total sem re-render completo
+  const wrap = document.getElementById('retornos-wrap-'+ei);
+  if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
 }
 
 function removerRetornoParcial(ei, ri){

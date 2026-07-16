@@ -1466,9 +1466,10 @@ function renderMesSelectParcial(ei, ri, mesSel){
 function adicionarRetornoParcial(ei){
   const o = ordens[ordemAtiva];
   if(!o.etapas[ei].retornos_parciais) o.etapas[ei].retornos_parciais = [];
-  o.etapas[ei].retornos_parciais.push({data:'', mes:'', qtd_tam:{}});
+  o.etapas[ei].retornos_parciais.push({data:'', mes:'', qtd_tam:{}, qtd:0});
   saveOrdens(ordens);
-  renderForm();
+  const wrap = document.getElementById('retornos-wrap-'+ei);
+  if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
 }
 
 function salvarRetornoParcial(ei, ri, campo, valor){
@@ -1503,7 +1504,8 @@ function removerRetornoParcial(ei, ri){
   if(!o.etapas[ei].retornos_parciais) return;
   o.etapas[ei].retornos_parciais.splice(ri,1);
   saveOrdens(ordens);
-  renderForm();
+  const wrap = document.getElementById('retornos-wrap-'+ei);
+  if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
 }
 // ─────────────────────────────────────────────────────────────────────────────
 const _MESES_LABEL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];

@@ -2,13 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-  <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="Closet Hub"/>
-  <meta name="theme-color" content="#4A3524"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Closet Infantil — Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -132,38 +126,7 @@ h1{
 
 /* ── FOOTER ── */
 footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-family:'Fraunces',serif;font-style:italic}
-
-  /* ── MOBILE RESPONSIVO ─────────────────────────────────────────────────────── */
-  @media(max-width:768px){
-    .wrap{padding:0 12px}
-    header{padding:16px 0 12px;gap:8px}
-    header img{height:38px!important}
-    h1,.header-title{font-size:16px!important}
-    .btn-back{font-size:11px;padding:5px 10px}
-    .modules{grid-template-columns:1fr 1fr!important}
-    .mod-name{font-size:13px}
-    .mod-desc{display:none}
-    .mod-tag{font-size:9px}
-    .grid{grid-template-columns:1fr!important}
-    .terc-card,.card{border-radius:14px}
-    .kpi-val{font-size:18px!important}
-    .filtros{gap:6px}
-    .filtros select,.filtros input[type=date]{font-size:12px;padding:7px 10px}
-    table{font-size:11px}
-    th,td{padding:6px 8px!important}
-    .total-geral{padding:16px!important;border-radius:14px}
-    .total-geral-valor{font-size:24px!important}
-    #backup-bar{padding:10px 12px;flex-wrap:wrap;gap:8px}
-    .btn-bkp{font-size:11px;padding:6px 12px}
-    /* Tela login */
-    .card{padding:28px 20px!important;margin:16px}
-  }
-  @media(max-width:480px){
-    .modules{grid-template-columns:1fr!important}
-    .kpi-row{flex-wrap:wrap}
-    .kpi{min-width:45%}
-  }
-  </style>
+</style>
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -202,17 +165,6 @@ footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-fa
       if(el) el.textContent = user.email;
       if(typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
     });
-  </script>
-  <script>
-    // Fix iOS PWA — inputs não abriam teclado em modo standalone
-    document.addEventListener('touchend', function(e){
-      const el = e.target;
-      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'){
-        e.preventDefault();
-        el.focus();
-        if(el.tagName!=='SELECT') el.click();
-      }
-    }, {passive:false});
   </script>
 </head>
 <body>
@@ -395,52 +347,29 @@ footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-fa
 const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
   'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
 
-// Fila de pendências — guarda o que precisa ser enviado ao Firebase
-const _fsPendentes = {};
-
 function _lsGet(key, def) {
   try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
 }
 function _lsSet(key, value) {
-  // 1. Salvar localStorage imediatamente
+  // 1. Salvar no localStorage diretamente (sem recursão)
   try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage error:',e); }
-  // 2. Tentar enviar ao Firebase
-  if(_fsKeys.includes(key)){
+  // 2. Sincronizar com Firebase (assíncrono, sem await para não bloquear)
+  if(window.fsSet && _fsKeys.includes(key)){
     try{
-      const safe = JSON.parse(JSON.stringify(value));
-      if(window.fsSet){
-        // Firebase disponível — enviar agora
-        window.fsSet(key, safe).catch(e=>{
-          console.warn('FS sync falhou, guardando na fila:',key);
-          _fsPendentes[key] = safe;
-        });
-      } else {
-        // Firebase ainda não inicializou — guardar na fila
-        _fsPendentes[key] = safe;
-      }
+      const safe = JSON.parse(JSON.stringify(value)); // quebrar referências circulares
+      window.fsSet(key, safe).catch(e=>console.warn('FS sync:',key,e.message));
     }catch(e){ console.warn('FS serialize error:',key,e.message); }
   }
 }
 
+// Ao iniciar: escutar mudanças do Firebase em tempo real
 window._onFirebaseReady = function() {
   if(window._fsInitDone) return;
   window._fsInitDone = true;
-
-  // Enviar tudo que ficou na fila enquanto Firebase não estava pronto
-  const pendentes = Object.keys(_fsPendentes);
-  if(pendentes.length > 0){
-    console.log('Enviando', pendentes.length, 'itens pendentes ao Firebase...');
-    pendentes.forEach(key => {
-      window.fsSet(key, _fsPendentes[key])
-        .then(()=>{ delete _fsPendentes[key]; })
-        .catch(e=>console.warn('Erro ao enviar pendente:',key,e.message));
-    });
-  }
-
-  // Escutar mudanças em tempo real
   _fsKeys.forEach(key => {
     window.fsListen(key, value => {
       if(value === null) return;
+      // Atualizar localStorage diretamente (sem chamar _lsSet para evitar loop)
       try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
       if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
     });
@@ -460,26 +389,15 @@ const BACKUP_KEYS = [
   { key: 'ci_fechamentos',      label: 'Fechamentos' },
 ];
 
-async function salvarBackup(){
-  const statusEl = document.getElementById('backup-status');
-  statusEl.textContent = '⏳ Preparando backup...';
-  
+function salvarBackup(){
   const dados = { versao: '1.0', data: new Date().toISOString(), modulos: {} };
   let total = 0;
-
-  for(const { key, label } of BACKUP_KEYS){
+  BACKUP_KEYS.forEach(({ key, label }) => {
     try {
-      // Tentar Firebase primeiro, fallback localStorage
-      let val = null;
-      if(window.fsGet){
-        val = await window.fsGet(key);
-      }
-      if(val === null){
-        val = _lsGet(key, null);
-      }
-      if(val !== null){ dados.modulos[key] = val; total++; }
+      const val = _lsGet(key, null);
+      if(val){ dados.modulos[key] = JSON.parse(val); total++; }
     } catch(e) {}
-  }
+  });
 
   const json = JSON.stringify(dados, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -546,14 +464,5 @@ function carregarBackup(input){
 }
 </script>
 
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(r=>console.log('SW registrado'))
-          .catch(e=>console.log('SW erro:',e));
-      });
-    }
-  </script>
 </body>
 </html>

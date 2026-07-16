@@ -412,45 +412,7 @@ tbody .status-empty{color:var(--chocolate-soft);opacity:.5}
     .kpi{min-width:45%}
   }
   </style>
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    const firebaseConfig = {
-      apiKey: "AIzaSyDtgPZ5sMOEb5ObqhVF-cVyTD6s6ENubKA",
-      authDomain: "closet-infantil-hub.firebaseapp.com",
-      projectId: "closet-infantil-hub",
-      storageBucket: "closet-infantil-hub.firebasestorage.app",
-      messagingSenderId: "580715110559",
-      appId: "1:580715110559:web:f6751ad3ba3376206442aa"
-    };
-    const app = initializeApp(firebaseConfig);
-    window._auth = getAuth(app);
-    window._db   = getFirestore(app);
-    window.fsSet = async (key, value) => {
-      await setDoc(doc(window._db,'hub',key),{data:JSON.stringify(value)});
-    };
-    window.fsGet = async (key) => {
-      const s = await getDoc(doc(window._db,'hub',key));
-      if(!s.exists()) return null;
-      try{ return JSON.parse(s.data().data); }catch(e){ return null; }
-    };
-    window.fsListen = (key, cb) => {
-      return onSnapshot(doc(window._db,'hub',key), s => {
-        if(!s.exists()){ cb(null); return; }
-        try{ cb(JSON.parse(s.data().data)); }catch(e){ cb(null); }
-      });
-    };
-    window.fsLogout = () => signOut(window._auth).then(()=>window.location.href='login.html');
-    onAuthStateChanged(window._auth, user => {
-      if(!user){ window.location.href='login.html'; return; }
-      window._user = user;
-      const el = document.getElementById('user-email');
-      if(el) el.textContent = user.email;
-      if(typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
-    });
-  </script>
+
   <script>
     // Fix iOS PWA — inputs não abriam teclado em modo standalone
     document.addEventListener('touchend', function(e){
@@ -473,7 +435,7 @@ tbody .status-empty{color:var(--chocolate-soft);opacity:.5}
     <h1>Calculadora de Friso</h1>
     <div class="tagline">Sistema vivo que aprende com cada produção</div>
     <div style="margin-top:18px">
-      <button onclick="window.location.href='index.html'" style="font-family:'Poppins',sans-serif;font-size:12px;font-weight:500;padding:7px 16px;border-radius:10px;border:1.5px solid var(--fenugreek-soft);background:transparent;color:var(--chocolate-soft);cursor:pointer">← Voltar ao Hub</button>
+      <button onclick="window.location.href='ClosetInfantil_Hub.html'" style="font-family:'Poppins',sans-serif;font-size:12px;font-weight:500;padding:7px 16px;border-radius:10px;border:1.5px solid var(--fenugreek-soft);background:transparent;color:var(--chocolate-soft);cursor:pointer">← Voltar ao Hub</button>
     </div>
   
   </header>
@@ -813,61 +775,13 @@ tbody .status-empty{color:var(--chocolate-soft);opacity:.5}
 </div>
 
 <script>
-// ── FIREBASE SYNC LAYER ──────────────────────────────────────────────────────
-const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
-  'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
-
-// Fila de pendências — guarda o que precisa ser enviado ao Firebase
-const _fsPendentes = {};
-
+// ── LOCAL STORAGE LAYER ──────────────────────────────────────────────────────
 function _lsGet(key, def) {
   try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
 }
 function _lsSet(key, value) {
-  // 1. Salvar localStorage imediatamente
-  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage error:',e); }
-  // 2. Tentar enviar ao Firebase
-  if(_fsKeys.includes(key)){
-    try{
-      const safe = JSON.parse(JSON.stringify(value));
-      if(window.fsSet){
-        // Firebase disponível — enviar agora
-        window.fsSet(key, safe).catch(e=>{
-          console.warn('FS sync falhou, guardando na fila:',key);
-          _fsPendentes[key] = safe;
-        });
-      } else {
-        // Firebase ainda não inicializou — guardar na fila
-        _fsPendentes[key] = safe;
-      }
-    }catch(e){ console.warn('FS serialize error:',key,e.message); }
-  }
+  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('_lsSet error:',e); }
 }
-
-window._onFirebaseReady = function() {
-  if(window._fsInitDone) return;
-  window._fsInitDone = true;
-
-  // Enviar tudo que ficou na fila enquanto Firebase não estava pronto
-  const pendentes = Object.keys(_fsPendentes);
-  if(pendentes.length > 0){
-    console.log('Enviando', pendentes.length, 'itens pendentes ao Firebase...');
-    pendentes.forEach(key => {
-      window.fsSet(key, _fsPendentes[key])
-        .then(()=>{ delete _fsPendentes[key]; })
-        .catch(e=>console.warn('Erro ao enviar pendente:',key,e.message));
-    });
-  }
-
-  // Escutar mudanças em tempo real
-  _fsKeys.forEach(key => {
-    window.fsListen(key, value => {
-      if(value === null) return;
-      try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
-      if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
-    });
-  });
-};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TAMANHOS = ['RN','P','M','G','GG'];

@@ -1,65 +1,60 @@
-const CACHE_NAME = 'closet-hub-v3';
-const URLS_TO_CACHE = [
-  '/closet-infantil-hub/',
-  '/closet-infantil-hub/index.html',
-  '/closet-infantil-hub/login.html',
-  '/closet-infantil-hub/ClosetInfantil_OrdemProducao.html',
-  '/closet-infantil-hub/ClosetInfantil_Terceirizados.html',
-  '/closet-infantil-hub/ClosetInfantil_FechamentoGeral.html',
-  '/closet-infantil-hub/ClosetInfantil_Custo.html',
-  '/closet-infantil-hub/ClosetInfantil_Precificacao.html',
-  '/closet-infantil-hub/ClosetInfantil_Friso.html',
-  '/closet-infantil-hub/ClosetInfantil_Sistema_Producao.html',
-  '/closet-infantil-hub/ClosetInfantil_Produtividade.html',
+// Service Worker - Closet Infantil Hub
+// Versão: incrementar aqui força atualização em todos os dispositivos
+const CACHE_VERSION = 'closet-hub-v7';
+const CACHE_STATIC = 'closet-static-v7';
+
+// Assets estáticos que podem ser cacheados (ícones, manifest)
+const STATIC_ASSETS = [
+  '/closet-infantil-hub/manifest.json',
+  '/closet-infantil-hub/icon-192.png',
+  '/closet-infantil-hub/icon-512.png',
+  '/closet-infantil-hub/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting(); // Ativa imediatamente sem esperar
+  self.skipWaiting(); // Ativar imediatamente
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
+    caches.open(CACHE_STATIC).then(cache => cache.addAll(STATIC_ASSETS))
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim()) // Toma controle imediato
+      Promise.all(keys
+        .filter(k => k !== CACHE_STATIC)
+        .map(k => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
-  // Firebase e APIs externas: sempre buscar da rede
-  if(event.request.url.includes('firebase') ||
-     event.request.url.includes('googleapis') ||
-     event.request.url.includes('gstatic')) {
+  const url = new URL(event.request.url);
+
+  // Firebase e APIs externas: sempre rede, nunca cache
+  if(url.hostname.includes('firebase') ||
+     url.hostname.includes('googleapis') ||
+     url.hostname.includes('gstatic') ||
+     url.hostname.includes('firestore')) {
+    return; // deixa o browser tratar normalmente
+  }
+
+  // HTMLs: sempre rede (network-only) — dados sempre frescos
+  if(url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // Sem internet: tentar cache como fallback
+        return caches.match(event.request);
+      })
+    );
     return;
   }
 
-  // Estratégia: network-first para HTMLs, cache-first para assets
-  const isHTML = event.request.url.endsWith('.html') || event.request.url.endsWith('/');
-  
-  if(isHTML) {
-    // Network first: sempre tenta pegar versão mais nova
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-  } else {
-    // Cache first para imagens e outros assets
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        return cached || fetch(event.request).then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        });
-      })
-    );
-  }
+  // Ícones e manifest: cache-first
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request);
+    })
+  );
 });

@@ -167,6 +167,90 @@ footer{text-align:center;font-size:.68rem;color:var(--fe);padding:12px;font-styl
   </style>
 
   <script>
+// ── FIREBASE SYNC LAYER ──────────────────────────────────────────────────────
+const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
+  'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
+
+const _fsPendentes = {}; // chave → {value, tentativas}
+let _fsReady = false;
+let _ultimoSave = {}; // chave → timestamp do último save local
+
+function _lsGet(key, def) {
+  try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
+}
+
+function _lsSet(key, value) {
+  // 1. Salvar localStorage imediatamente
+  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage:',e); return; }
+  _ultimoSave[key] = Date.now();
+
+  if(!_fsKeys.includes(key)) return;
+
+  // 2. Serializar para evitar referências circulares
+  let safe;
+  try{ safe = JSON.parse(JSON.stringify(value)); }catch(e){ return; }
+
+  if(_fsReady && window.fsSet){
+    // Firebase pronto — enviar agora com retry
+    _fsSend(key, safe, 0);
+  } else {
+    // Firebase não pronto — fila
+    _fsPendentes[key] = { value: safe, tentativas: 0 };
+  }
+}
+
+function _fsSend(key, value, tentativa){
+  if(!window.fsSet) return;
+  _mostrarSync(true);
+  window.fsSet(key, value)
+    .then(()=>{
+      delete _fsPendentes[key];
+      _mostrarSync(false);
+    })
+    .catch(e=>{
+      console.warn('FS sync erro (tentativa '+tentativa+'):', key, e.message);
+      if(tentativa < 3){
+        // Retry com backoff
+        setTimeout(()=>_fsSend(key, value, tentativa+1), (tentativa+1)*2000);
+      } else {
+        _fsPendentes[key] = { value, tentativas: tentativa };
+        _mostrarSync(false, true);
+      }
+    });
+}
+
+function _mostrarSync(ativo, erro){
+  const el = document.getElementById('sync-indicator');
+  if(!el) return;
+  if(ativo){ el.textContent='☁️ Salvando...'; el.style.color='var(--am)'; }
+  else if(erro){ el.textContent='⚠️ Erro ao salvar'; el.style.color='var(--rd)'; }
+  else{ el.textContent='✅ Salvo'; el.style.color='var(--gn)'; setTimeout(()=>{ if(el) el.textContent=''; },2000); }
+}
+
+window._onFirebaseReady = function() {
+  if(_fsReady) return;
+  _fsReady = true;
+
+  // Enviar tudo que ficou na fila
+  Object.entries(_fsPendentes).forEach(([key, {value}])=>{
+    _fsSend(key, value, 0);
+  });
+
+  // Escutar mudanças em tempo real
+  _fsKeys.forEach(key => {
+    window.fsListen(key, value => {
+      if(value === null) return;
+      // Só atualizar se o dado do Firebase for mais recente que o último save local
+      // (evita sobrescrever dado recém-salvo)
+      const tsLocal = _ultimoSave[key] || 0;
+      const agora = Date.now();
+      if(agora - tsLocal < 3000) return; // ignorar por 3s após save local
+      try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+      if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
+    });
+  });
+};
+// ─────────────────────────────────────────────────────────────────────────────
     // Fix iOS PWA — inputs não abriam teclado em modo standalone
     document.addEventListener('touchend', function(e){
       const el = e.target;

@@ -2,7 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Closet Hub"/>
+  <meta name="theme-color" content="#4A3524"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Closet Infantil — Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -126,45 +132,133 @@ h1{
 
 /* ── FOOTER ── */
 footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-family:'Fraunces',serif;font-style:italic}
-</style>
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    const firebaseConfig = {
-      apiKey: "AIzaSyDtgPZ5sMOEb5ObqhVF-cVyTD6s6ENubKA",
-      authDomain: "closet-infantil-hub.firebaseapp.com",
-      projectId: "closet-infantil-hub",
-      storageBucket: "closet-infantil-hub.firebasestorage.app",
-      messagingSenderId: "580715110559",
-      appId: "1:580715110559:web:f6751ad3ba3376206442aa"
-    };
-    const app = initializeApp(firebaseConfig);
-    window._auth = getAuth(app);
-    window._db   = getFirestore(app);
-    window.fsSet = async (key, value) => {
-      await setDoc(doc(window._db,'hub',key),{data:JSON.stringify(value)});
-    };
-    window.fsGet = async (key) => {
-      const s = await getDoc(doc(window._db,'hub',key));
-      if(!s.exists()) return null;
-      try{ return JSON.parse(s.data().data); }catch(e){ return null; }
-    };
-    window.fsListen = (key, cb) => {
-      return onSnapshot(doc(window._db,'hub',key), s => {
-        if(!s.exists()){ cb(null); return; }
-        try{ cb(JSON.parse(s.data().data)); }catch(e){ cb(null); }
-      });
-    };
-    window.fsLogout = () => signOut(window._auth).then(()=>window.location.href='login.html');
-    onAuthStateChanged(window._auth, user => {
-      if(!user){ window.location.href='login.html'; return; }
-      window._user = user;
-      const el = document.getElementById('user-email');
-      if(el) el.textContent = user.email;
-      if(typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
+
+  /* ── MOBILE RESPONSIVO ─────────────────────────────────────────────────────── */
+  @media(max-width:768px){
+    .wrap{padding:0 12px}
+    header{padding:16px 0 12px;gap:8px}
+    header img{height:38px!important}
+    h1,.header-title{font-size:16px!important}
+    .btn-back{font-size:11px;padding:5px 10px}
+    .modules{grid-template-columns:1fr 1fr!important}
+    .mod-name{font-size:13px}
+    .mod-desc{display:none}
+    .mod-tag{font-size:9px}
+    .grid{grid-template-columns:1fr!important}
+    .terc-card,.card{border-radius:14px}
+    .kpi-val{font-size:18px!important}
+    .filtros{gap:6px}
+    .filtros select,.filtros input[type=date]{font-size:12px;padding:7px 10px}
+    table{font-size:11px}
+    th,td{padding:6px 8px!important}
+    .total-geral{padding:16px!important;border-radius:14px}
+    .total-geral-valor{font-size:24px!important}
+    #backup-bar{padding:10px 12px;flex-wrap:wrap;gap:8px}
+    .btn-bkp{font-size:11px;padding:6px 12px}
+    /* Tela login */
+    .card{padding:28px 20px!important;margin:16px}
+  }
+  @media(max-width:480px){
+    .modules{grid-template-columns:1fr!important}
+    .kpi-row{flex-wrap:wrap}
+    .kpi{min-width:45%}
+  }
+  </style>
+
+  <script>
+// ── FIREBASE SYNC LAYER ──────────────────────────────────────────────────────
+const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
+  'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
+
+const _fsPendentes = {}; // chave → {value, tentativas}
+let _fsReady = false;
+let _ultimoSave = {}; // chave → timestamp do último save local
+
+function _lsGet(key, def) {
+  try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
+}
+
+function _lsSet(key, value) {
+  // 1. Salvar localStorage imediatamente
+  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage:',e); return; }
+  _ultimoSave[key] = Date.now();
+
+  if(!_fsKeys.includes(key)) return;
+
+  // 2. Serializar para evitar referências circulares
+  let safe;
+  try{ safe = JSON.parse(JSON.stringify(value)); }catch(e){ return; }
+
+  if(_fsReady && window.fsSet){
+    // Firebase pronto — enviar agora com retry
+    _fsSend(key, safe, 0);
+  } else {
+    // Firebase não pronto — fila
+    _fsPendentes[key] = { value: safe, tentativas: 0 };
+  }
+}
+
+function _fsSend(key, value, tentativa){
+  if(!window.fsSet) return;
+  _mostrarSync(true);
+  window.fsSet(key, value)
+    .then(()=>{
+      delete _fsPendentes[key];
+      _mostrarSync(false);
+    })
+    .catch(e=>{
+      console.warn('FS sync erro (tentativa '+tentativa+'):', key, e.message);
+      if(tentativa < 3){
+        // Retry com backoff
+        setTimeout(()=>_fsSend(key, value, tentativa+1), (tentativa+1)*2000);
+      } else {
+        _fsPendentes[key] = { value, tentativas: tentativa };
+        _mostrarSync(false, true);
+      }
     });
+}
+
+function _mostrarSync(ativo, erro){
+  const el = document.getElementById('sync-indicator');
+  if(!el) return;
+  if(ativo){ el.textContent='☁️ Salvando...'; el.style.color='var(--am)'; }
+  else if(erro){ el.textContent='⚠️ Erro ao salvar'; el.style.color='var(--rd)'; }
+  else{ el.textContent='✅ Salvo'; el.style.color='var(--gn)'; setTimeout(()=>{ if(el) el.textContent=''; },2000); }
+}
+
+window._onFirebaseReady = function() {
+  if(_fsReady) return;
+  _fsReady = true;
+
+  // Enviar tudo que ficou na fila
+  Object.entries(_fsPendentes).forEach(([key, {value}])=>{
+    _fsSend(key, value, 0);
+  });
+
+  // Escutar mudanças em tempo real
+  _fsKeys.forEach(key => {
+    window.fsListen(key, value => {
+      if(value === null) return;
+      // Só atualizar se o dado do Firebase for mais recente que o último save local
+      // (evita sobrescrever dado recém-salvo)
+      const tsLocal = _ultimoSave[key] || 0;
+      const agora = Date.now();
+      if(agora - tsLocal < 3000) return; // ignorar por 3s após save local
+      try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+      if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
+    });
+  });
+};
+// ─────────────────────────────────────────────────────────────────────────────
+    // Fix iOS PWA — inputs não abriam teclado em modo standalone
+    document.addEventListener('touchend', function(e){
+      const el = e.target;
+      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'){
+        e.preventDefault();
+        el.focus();
+        if(el.tagName!=='SELECT') el.click();
+      }
+    }, {passive:false});
   </script>
 </head>
 <body>
@@ -176,7 +270,7 @@ footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-fa
     </div>
     <h1>Central de Sistemas</h1>
     <div class="tagline">Pequenos looks, grandes histórias</div>
-  <div id="user-bar" style="display:flex;align-items:center;gap:8px"><span id="user-email" style="font-size:11px;color:var(--fe);opacity:.8"></span><button onclick="fsLogout()" style="background:none;border:1.5px solid var(--fe2);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--fe);cursor:pointer;font-family:Poppins,sans-serif">Sair</button></div>
+  <div style="display:none" style="display:flex;align-items:center;gap:8px"><span id="user-email" style="font-size:11px;color:var(--fe);opacity:.8"></span><button onclick="fsLogout()" style="background:none;border:1.5px solid var(--fe2);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--fe);cursor:pointer;font-family:Poppins,sans-serif">Sair</button></div>
   </header>
 
 
@@ -343,38 +437,13 @@ footer{text-align:center;padding:24px 0 0;font-size:12px;color:var(--fe);font-fa
 <div style="height:60px"></div><!-- espaço para a barra fixa -->
 
 <script>
-// ── FIREBASE SYNC LAYER ──────────────────────────────────────────────────────
-const _fsKeys = ['ci_ordens_producao','ci_lote_seq','ci_terceirizados',
-  'ci_fechamentos','ci_custo_historico','ci_base_produtos','closet_friso_v3'];
-
+// ── LOCAL STORAGE LAYER ──────────────────────────────────────────────────────
 function _lsGet(key, def) {
   try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; }
 }
 function _lsSet(key, value) {
-  // 1. Salvar no localStorage diretamente (sem recursão)
-  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('localStorage error:',e); }
-  // 2. Sincronizar com Firebase (assíncrono, sem await para não bloquear)
-  if(window.fsSet && _fsKeys.includes(key)){
-    try{
-      const safe = JSON.parse(JSON.stringify(value)); // quebrar referências circulares
-      window.fsSet(key, safe).catch(e=>console.warn('FS sync:',key,e.message));
-    }catch(e){ console.warn('FS serialize error:',key,e.message); }
-  }
+  try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ console.error('_lsSet error:',e); }
 }
-
-// Ao iniciar: escutar mudanças do Firebase em tempo real
-window._onFirebaseReady = function() {
-  if(window._fsInitDone) return;
-  window._fsInitDone = true;
-  _fsKeys.forEach(key => {
-    window.fsListen(key, value => {
-      if(value === null) return;
-      // Atualizar localStorage diretamente (sem chamar _lsSet para evitar loop)
-      try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
-      if(typeof window._onDataUpdate === 'function') window._onDataUpdate(key);
-    });
-  });
-};
 // ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -389,15 +458,26 @@ const BACKUP_KEYS = [
   { key: 'ci_fechamentos',      label: 'Fechamentos' },
 ];
 
-function salvarBackup(){
+async function salvarBackup(){
+  const statusEl = document.getElementById('backup-status');
+  statusEl.textContent = '⏳ Preparando backup...';
+  
   const dados = { versao: '1.0', data: new Date().toISOString(), modulos: {} };
   let total = 0;
-  BACKUP_KEYS.forEach(({ key, label }) => {
+
+  for(const { key, label } of BACKUP_KEYS){
     try {
-      const val = _lsGet(key, null);
-      if(val){ dados.modulos[key] = JSON.parse(val); total++; }
+      // Tentar Firebase primeiro, fallback localStorage
+      let val = null;
+      if(window.fsGet){
+        val = await window.fsGet(key);
+      }
+      if(val === null){
+        val = _lsGet(key, null);
+      }
+      if(val !== null){ dados.modulos[key] = val; total++; }
     } catch(e) {}
-  });
+  }
 
   const json = JSON.stringify(dados, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -423,36 +503,24 @@ function carregarBackup(input){
       const dados = JSON.parse(e.target.result);
       if(!dados.modulos) throw new Error('Arquivo inválido');
 
-      statusEl.textContent = '⏳ Aguardando conexão com Firebase...';
-
-      // Aguardar Firebase estar disponível (max 10s)
-      let tentativas = 0;
-      while(!window.fsSet && tentativas < 20) {
-        await new Promise(r=>setTimeout(r,500));
-        tentativas++;
-      }
-      if(!window.fsSet) throw new Error('Firebase não disponível. Tente recarregar a página.');
-
-      statusEl.textContent = '⏳ Enviando dados para a nuvem...';
+      statusEl.textContent = '⏳ Restaurando dados...';
 
       let restaurados = 0;
-      for(const { key } of BACKUP_KEYS){
+      BACKUP_KEYS.forEach(({ key }) => {
         if(dados.modulos[key] !== undefined){
-          try{ localStorage.setItem(key, JSON.stringify(dados.modulos[key])); }catch(e){}
-          await window.fsSet(key, dados.modulos[key]);
+          _lsSet(key, dados.modulos[key]);
           restaurados++;
-          statusEl.textContent = `⏳ Enviando... ${restaurados}/${BACKUP_KEYS.length} módulos`;
         }
-      }
+      });
 
       const dataBackup = dados.data
         ? new Date(dados.data).toLocaleString('pt-BR')
         : 'data desconhecida';
 
       statusEl.textContent =
-        `✅ ${restaurados} módulo(s) enviados para a nuvem · Backup de ${dataBackup} · Recarregando...`;
+        `✅ ${restaurados} módulo(s) restaurados · Backup de ${dataBackup} · Recarregando...`;
 
-      setTimeout(()=>location.reload(), 2000);
+      setTimeout(()=>location.reload(), 1200);
 
     } catch(err) {
       document.getElementById('backup-status').textContent =
@@ -464,5 +532,14 @@ function carregarBackup(input){
 }
 </script>
 
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(r=>console.log('SW registrado'))
+          .catch(e=>console.log('SW erro:',e));
+      });
+    }
+  </script>
 </body>
 </html>

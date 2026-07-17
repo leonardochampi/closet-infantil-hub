@@ -1763,6 +1763,15 @@ document.addEventListener('DOMContentLoaded', function(){
           .catch(e=>console.log('SW erro:',e));
       });
     }
-  </script>
+  
+// Recarregar ao receber dados do Firebase em outro dispositivo
+window._onDataUpdate = function(key) {
+  if(key === OP_KEY || key === SEQ_KEY){
+    ordens = loadOrdens();
+    renderLista();
+    if(ordemAtiva !== null && ordens[ordemAtiva]) renderForm();
+  }
+};
+</script>
 </body>
 </html>

@@ -675,6 +675,11 @@ document.addEventListener('DOMContentLoaded', function(){
           .catch(e=>console.log('SW erro:',e));
       });
     }
-  </script>
+  
+// Recarregar ao receber dados do Firebase em outro dispositivo
+window._onDataUpdate = function(key) {
+  renderDashboard();
+};
+</script>
 </body>
 </html>

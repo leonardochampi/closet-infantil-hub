@@ -566,6 +566,13 @@ function render(){
           .catch(e=>console.log('SW erro:',e));
       });
     }
-  </script>
+  
+// Recarregar ao receber dados do Firebase em outro dispositivo
+window._onDataUpdate = function(key) {
+  if(key === 'ci_ordens_producao' || key === 'ci_terceirizados'){
+    init();
+  }
+};
+</script>
 </body>
 </html>

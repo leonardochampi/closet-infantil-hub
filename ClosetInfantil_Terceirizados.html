@@ -1366,6 +1366,15 @@ if(!isNaN(_idxParam) && _idxParam >= 0 && _idxParam < terceirizados.length){
           .catch(e=>console.log('SW erro:',e));
       });
     }
-  </script>
+  
+// Recarregar ao receber dados do Firebase em outro dispositivo
+window._onDataUpdate = function(key) {
+  if(key === TERC_KEY || key === FECH_KEY){
+    terceirizados = loadTerc();
+    renderListaTerc();
+    renderMain();
+  }
+};
+</script>
 </body>
 </html>

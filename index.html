@@ -491,48 +491,54 @@ async function salvarBackup(){
 
 function carregarBackup(input){
   const file = input.files[0];
-  if(!file) return;
+  if(!file){ alert('Selecione um arquivo.'); return; }
+  const statusEl = document.getElementById('backup-status');
+  statusEl.textContent = '⏳ Lendo arquivo...';
   const reader = new FileReader();
-  reader.onload = async function(e) {
-    const statusEl = document.getElementById('backup-status');
+  reader.onload = function(e) {
     try {
       const dados = JSON.parse(e.target.result);
-      if(!dados.modulos) throw new Error('Arquivo inválido');
+      if(!dados || !dados.modulos) throw new Error('Arquivo inválido ou corrompido.');
+      
       statusEl.textContent = '⏳ Restaurando dados...';
-
-      // 1. Salvar no localStorage imediatamente
       let restaurados = 0;
+      
+      // Salvar cada chave no localStorage
       BACKUP_KEYS.forEach(function(item){
         if(dados.modulos[item.key] !== undefined){
-          try{ localStorage.setItem(item.key, JSON.stringify(dados.modulos[item.key])); }catch(err){}
+          localStorage.setItem(item.key, JSON.stringify(dados.modulos[item.key]));
           restaurados++;
         }
       });
-
-      // 2. Enviar ao Firebase (aguardar até 8s se não estiver pronto)
-      let tentativas = 0;
-      while(!window.fsSet && tentativas < 16){ await new Promise(r=>setTimeout(r,500)); tentativas++; }
+      
+      if(restaurados === 0) throw new Error('Nenhum dado encontrado no arquivo.');
+      
+      const dataBackup = dados.data
+        ? new Date(dados.data).toLocaleString('pt-BR')
+        : 'data desconhecida';
+      
+      statusEl.textContent = '✅ ' + restaurados + ' módulos restaurados (backup de ' + dataBackup + '). Sincronizando com nuvem e recarregando...';
+      
+      // Enviar ao Firebase em background (não bloqueia o reload)
       if(window.fsSet){
-        statusEl.textContent = '⏳ Enviando para a nuvem...';
-        let enviados = 0;
-        for(const item of BACKUP_KEYS){
+        BACKUP_KEYS.forEach(function(item){
           if(dados.modulos[item.key] !== undefined){
-            try{
-              await window.fsSet(item.key, dados.modulos[item.key]);
-              enviados++;
-              statusEl.textContent = `⏳ Enviando... ${enviados}/${restaurados} módulos`;
-            }catch(err){ console.warn('Erro ao enviar:', item.key, err); }
+            window.fsSet(item.key, dados.modulos[item.key]).catch(function(){});
           }
-        }
+        });
       }
-
-      const dataBackup = dados.data ? new Date(dados.data).toLocaleString('pt-BR') : 'data desconhecida';
-      statusEl.textContent = '✅ ' + restaurados + ' módulo(s) restaurados e enviados para a nuvem · Backup de ' + dataBackup + ' · Recarregando...';
-      setTimeout(function(){ location.reload(); }, 2000);
+      
+      setTimeout(function(){ location.reload(); }, 2500);
+      
     } catch(err) {
-      document.getElementById('backup-status').textContent = '❌ Erro: ' + err.message;
+      statusEl.textContent = '❌ Erro: ' + err.message;
+      alert('Erro ao carregar backup: ' + err.message);
     }
     input.value = '';
+  };
+  reader.onerror = function(){
+    statusEl.textContent = '❌ Erro ao ler o arquivo.';
+    alert('Não foi possível ler o arquivo. Tente novamente.');
   };
   reader.readAsText(file);
 }

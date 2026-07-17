@@ -528,9 +528,64 @@ function carregarBackup(input){
     }
     input.value = '';
   };
-  reader.readAsText(file);
-}
-</script>
+  // ── BACKUP AUTOMÁTICO DIÁRIO ─────────────────────────────────────────────
+  // Verifica se já passaram 24h desde o último backup automático
+  async function backupAutomatico(){
+    const CHAVE = 'ci_ultimo_backup_auto';
+    const agora = Date.now();
+    const ultimo = parseInt(localStorage.getItem(CHAVE)||'0');
+    const passaram = agora - ultimo;
+    const UM_DIA = 24 * 60 * 60 * 1000;
+
+    if(passaram < UM_DIA) return; // menos de 24h, não faz nada
+
+    // Aguardar Firebase estar pronto (até 8s)
+    let tentativas = 0;
+    while(!window.fsGet && tentativas < 16){
+      await new Promise(r=>setTimeout(r,500));
+      tentativas++;
+    }
+
+    const statusEl = document.getElementById('backup-status');
+    if(statusEl) statusEl.textContent = '⏳ Gerando backup automático...';
+
+    const dados = { versao:'1.0', data: new Date().toISOString(), auto: true, modulos:{} };
+    for(const { key } of BACKUP_KEYS){
+      try{
+        let val = window.fsGet ? await window.fsGet(key) : null;
+        if(!val){ const v=localStorage.getItem(key); val=v?JSON.parse(v):null; }
+        if(val) dados.modulos[key] = val;
+      }catch(e){}
+    }
+
+    // Baixar arquivo
+    const json = JSON.stringify(dados, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+    a.href = url;
+    a.download = `ClosetInfantil_backup_auto_${hoje}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Registrar horário do backup
+    localStorage.setItem(CHAVE, agora.toString());
+
+    if(statusEl) statusEl.textContent = `✅ Backup automático gerado · ${new Date().toLocaleString('pt-BR')}`;
+    setTimeout(()=>{ if(statusEl && statusEl.textContent.includes('automático')) statusEl.textContent=''; }, 5000);
+  }
+
+  // Executar após Firebase carregar
+  const _origFirebaseReady = window._onFirebaseReady;
+  window._onFirebaseReady = function(){
+    if(_origFirebaseReady) _origFirebaseReady();
+    setTimeout(backupAutomatico, 3000); // aguarda 3s para Firebase sincronizar
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
 
   <script>
     if('serviceWorker' in navigator){

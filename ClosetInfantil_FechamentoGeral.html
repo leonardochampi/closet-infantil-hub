@@ -55,6 +55,7 @@ header{padding:28px 0 20px;display:flex;align-items:center;justify-content:space
 .badge-st{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:6px}
 .badge-pago{background:var(--gn2);color:var(--gn)}
 .badge-pagar{background:var(--am2);color:var(--am)}
+.badge-parcial{background:var(--bl2);color:var(--bl)}
 .badge-vazio{background:var(--pa2);color:var(--fe)}
 .empty{text-align:center;padding:40px;color:var(--fe);font-style:italic;font-size:13px}
 /* Print */
@@ -301,6 +302,12 @@ function getAdiantamentos(tercId, mes){
 function totalAdiantamentos(tercId, mes){
   return getAdiantamentos(tercId,mes).reduce((s,a)=>s+(parseFloat(a.valor)||0),0);
 }
+function getPagamentos(tercId, mes){
+  try{ const f=loadFech(); return (f[`${tercId}_${mes}`]||{}).pagamentos||[]; }catch(e){ return []; }
+}
+function totalPagoParc(tercId, mes){
+  return getPagamentos(tercId,mes).reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
+}
 
 function getServicosEtapa(t,etapaId){ return (t.servicos||[]).filter(s=>s.etapa_id===etapaId) }
 
@@ -503,6 +510,11 @@ function renderDashboard(){
   const renderCard = d => {
     const st = d.st;
     const isPago = st.status==='pago';
+  const tPagoParc = totalPagoParc(d.t.id, mesAtual());
+  const tAdiant2  = totalAdiantamentos(d.t.id, mesAtual());
+  const totalDevido2 = Math.max(0, d.totalGeral - tAdiant2);
+  const temParcial = tPagoParc > 0 && tPagoParc < totalDevido2;
+  const quitado = tPagoParc >= totalDevido2 && totalDevido2 > 0;
     const temConcluido = d.totalGeral>0;
     const temAProduzir = d.ap.total>0;
     const temDados = temConcluido || temAProduzir;
@@ -518,8 +530,8 @@ function renderDashboard(){
       <div class="terc-header">
         <div>
           <div class="terc-nome">${d.t.nome||'—'}</div>
-          <span class="badge-st ${isPago?'badge-pago':temDados?'badge-pagar':'badge-vazio'}">${isPago?'✅ Pago':temDados?'⏳ Pendente':'Sem lançamentos'}</span>
-          ${isPago?'<div style="font-size:10px;color:var(--gn);margin-top:2px">Pago em '+fmtData(st.data_pgto)+'</div>':''}
+          <span class="badge-st ${quitado||isPago?'badge-pago':temParcial?'badge-parcial':temDados?'badge-pagar':'badge-vazio'}">${quitado||isPago?'✅ Pago':temParcial?'💳 Parcial':temDados?'⏳ Pendente':'Sem lançamentos'}</span>
+          ${(quitado||isPago)?'<div style="font-size:10px;color:var(--gn);margin-top:2px">Quitado</div>':temParcial?`<div style="font-size:10px;color:var(--bl);margin-top:2px">Pago R$ ${fmt2(tPagoParc)} de R$ ${fmt2(totalDevido2)}</div>`:''}
         </div>
         <div style="text-align:right">
           ${temConcluido?`<div style="font-size:11px;opacity:.6">✅ Concluído</div><div class="terc-valor" style="color:var(--ch)">R$ ${fmt2(d.totalGeral)}</div>`:''}
@@ -635,7 +647,7 @@ function imprimirGeral(){
         <div style="font-size:8pt;font-weight:700;color:#B5916B;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #D4B898;padding-bottom:3px;margin-bottom:6px">${d.t.nome}</div>
         ${d.linhas.length?`<table class="pr-table" style="margin-bottom:6px">
           <thead><tr><th>Ordem</th><th>Produto</th><th>Etapa</th><th class="r">Qtd</th><th class="r">R$/pç</th><th class="r">Total</th></tr></thead>
-          <tbody>${d.linhas.map(l=>`<tr><td>${l.cod||'—'}</td><td>${l.produto||'—'}</td><td>${l.etapa}</td><td class="r">${l.qtd}</td><td class="r">R$ ${fmt2(l.vUnit)}</td><td class="r">R$ ${fmt2(l.valor)}</td></tr>`).join('')}</tbody>
+          <tbody>${d.linhas.map(l=>`<tr><td><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod||'')}&from=terceirizados&tercIdx=${d.i}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2);font-weight:600">${l.cod||'—'}</a></td><td>${l.produto||'—'}</td><td>${l.etapa}</td><td class="r">${l.qtd}</td><td class="r">R$ ${fmt2(l.vUnit)}</td><td class="r">R$ ${fmt2(l.valor)}</td></tr>`).join('')}</tbody>
         </table>`:''}
         ${d.lancamentos.length?`<table class="pr-table">
           <thead><tr><th>Lançamento manual</th><th>Data</th><th class="r">Qtd</th><th class="r">R$/un</th><th class="r">Total</th></tr></thead>

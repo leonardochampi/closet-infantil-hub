@@ -649,12 +649,82 @@ function totalGeral(linhas, tercId, mes){
 }
 function getFechStatus(tercId, mesAno){
   const fech = loadFech();
-  return fech[`${tercId}_${mesAno}`] || { status:'a_pagar', data_pgto:'' };
+  return fech[`${tercId}_${mesAno}`] || { status:'a_pagar', data_pgto:'', pagamentos:[] };
 }
 function setFechStatus(tercId, mesAno, status, data_pgto=''){
   const fech = loadFech();
-  fech[`${tercId}_${mesAno}`] = { status, data_pgto };
+  const atual = fech[`${tercId}_${mesAno}`] || { pagamentos:[] };
+  fech[`${tercId}_${mesAno}`] = { ...atual, status, data_pgto };
   saveFech(fech); renderMain();
+}
+
+// Pagamentos parciais
+function getPagamentos(tercId, mes){
+  const st = getFechStatus(tercId, mes);
+  return st.pagamentos || [];
+}
+function adicionarPagamento(tercId, mes, data, valor, obs){
+  const fech = loadFech();
+  const key = `${tercId}_${mes}`;
+  const atual = fech[key] || { status:'a_pagar', data_pgto:'', pagamentos:[] };
+  if(!atual.pagamentos) atual.pagamentos = [];
+  atual.pagamentos.push({ id: Date.now().toString(36), data, valor: parseFloat(valor)||0, obs });
+  fech[key] = atual;
+  saveFech(fech);
+  atualizarFechamento(mes);
+}
+function removerPagamento(tercId, mes, id){
+  const fech = loadFech();
+  const key = `${tercId}_${mes}`;
+  if(!fech[key]) return;
+  fech[key].pagamentos = (fech[key].pagamentos||[]).filter(p=>p.id!==id);
+  saveFech(fech);
+  atualizarFechamento(mes);
+}
+function totalPago(tercId, mes){
+  return getPagamentos(tercId, mes).reduce((s,p)=>s+(parseFloat(p.valor)||0), 0);
+}
+function renderPagamentos(tercId, mes, totalDevido){
+  const pags = getPagamentos(tercId, mes);
+  const totalJ = totalPago(tercId, mes);
+  const saldo = Math.max(0, totalDevido - totalJ);
+  const quitado = totalJ >= totalDevido && totalDevido > 0;
+  return `<div style="margin-top:16px;background:${quitado?'#EAF0E8':'#f8f4ee'};border-radius:var(--r-sm);padding:14px;border:1.5px solid ${quitado?'var(--gn2)':'var(--fe2)'}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:${quitado?'var(--gn)':'var(--ch2)'};text-transform:uppercase;letter-spacing:.06em">
+        ${quitado?'✅ Quitado':'💳 Pagamentos'}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--ch2)">Pago: <strong style="color:var(--gn)">R$ ${fmt2(totalJ)}</strong></div>
+        ${!quitado&&totalDevido>0?`<div style="font-size:11px;color:var(--rd)">Saldo: <strong>R$ ${fmt2(saldo)}</strong></div>`:''}
+      </div>
+    </div>
+    ${pags.length?`<table class="fech-table" style="margin-bottom:10px;background:#fff;font-size:11px">
+      <thead><tr><th>Data</th><th>Observação</th><th class="th-num">Valor</th><th></th></tr></thead>
+      <tbody>
+        ${pags.map(p=>`<tr>
+          <td style="white-space:nowrap">${p.data?new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+          <td>${p.obs||'—'}</td>
+          <td class="td-num" style="color:var(--gn);font-weight:600">R$ ${fmt2(p.valor)}</td>
+          <td style="text-align:center"><button onclick="removerPagamento('${tercId}','${mes}','${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:14px">×</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="min-width:130px;margin-bottom:0"><label>Data</label><input type="date" id="pag-data-${tercId}" /></div>
+      <div class="field" style="flex:1;min-width:80px;margin-bottom:0"><label>Valor (R$)</label><input type="number" id="pag-valor-${tercId}" min="0" step="0.01" placeholder="${fmt2(saldo>0?saldo:totalDevido)}"/></div>
+      <div class="field" style="flex:2;min-width:120px;margin-bottom:0"><label>Observação</label><input type="text" id="pag-obs-${tercId}" placeholder="Opcional"/></div>
+      <button class="btn btn-ghost btn-sm" onclick="
+        const d=document.getElementById('pag-data-${tercId}').value;
+        const v=document.getElementById('pag-valor-${tercId}').value;
+        const o=document.getElementById('pag-obs-${tercId}').value;
+        if(!v){alert('Informe o valor.');return;}
+        adicionarPagamento('${tercId}','${mes}',d,v,o);
+        document.getElementById('pag-valor-${tercId}').value='';
+        document.getElementById('pag-obs-${tercId}').value='';
+      ">+ Registrar</button>
+    </div>
+  </div>`;
 }
 
 // ── RENDER LISTA TERCEIRIZADOS ────────────────────────────────────────────────
@@ -867,21 +937,12 @@ function renderFechBody(mes){
     ${tabelaAP}
     ${renderLancamentos(t.id, mes)}
     ${renderAdiantamentos(t.id, mes)}
-    <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;background:var(--pa2);border-radius:var(--r-sm)">
-      <div style="flex:1">
-        <div style="font-size:11px;color:var(--ch2);font-weight:500">Status do pagamento</div>
-        ${(()=>{ const tAdiant=totalAdiantamentos(t.id,mes); const tGeral=totalGeral([],t.id,mes); const saldo=tGeral-tAdiant; return `<div style="font-size:20px;font-weight:700;color:var(--ch);font-family:Georgia,serif" id="fech-valor-status">R$ ${fmt2(saldo)}</div>`+(tAdiant>0?`<div style="font-size:11px;color:var(--rd)">💸 Adiantamentos: − R$ ${fmt2(tAdiant)}</div>`:''); })()}
-        ${isPago?'<div style="font-size:11px;color:var(--gn)">✅ Pago em '+fmtData(st.data_pgto)+'</div>':'<div style="font-size:11px;color:var(--am)">⏳ Aguardando pagamento</div>'}
-      </div>
-      ${isPago
-        ? '<button class="btn btn-ghost btn-sm" onclick="setFechStatus(\''+t.id+'\',\''+mes+'\',\'a_pagar\')">↩ Marcar como pendente</button>'
-        : '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'
-          +'<div class="field" style="margin-bottom:0"><label>Data do pagamento</label>'
-          +'<input type="date" id="data-pgto" style="padding:6px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:Poppins,sans-serif;font-size:12px"/></div>'
-          +'<button class="btn btn-primary btn-sm" onclick="marcarPago(\''+t.id+'\',\''+mes+'\')">✓ Marcar como pago</button>'
-          +'</div>'
-      }
-    </div>`;
+    ${(()=>{
+      const tAdiant = totalAdiantamentos(t.id, mes);
+      const tGeral  = totalGeral([], t.id, mes);
+      const totalDevido = Math.max(0, tGeral - tAdiant);
+      return renderPagamentos(t.id, mes, totalDevido);
+    })()}`;
 
   return `
     <div style="overflow-x:auto">
@@ -915,23 +976,12 @@ function renderFechBody(mes){
     ${tabelaAP}
     ${renderLancamentos(t.id, mes)}
     ${renderAdiantamentos(t.id, mes)}
-    <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;background:var(--pa2);border-radius:var(--r-sm)">
-      <div style="flex:1">
-        <div style="font-size:11px;color:var(--ch2);font-weight:500">Status do pagamento</div>
-        ${(()=>{ const tAdiant=totalAdiantamentos(t.id,mes); const tGeral=totalGeral(linhas,t.id,mes); const saldo=tGeral-tAdiant; return `<div style="font-size:20px;font-weight:700;color:var(--ch);font-family:'Fraunces',serif" id="fech-valor-status">R$ ${fmt2(saldo)}</div>`+(tAdiant>0?`<div style="font-size:11px;color:var(--rd)">💸 Adiantamentos: − R$ ${fmt2(tAdiant)}</div>`:''); })()}
-        ${isPago?`<div style="font-size:11px;color:var(--gn)">✅ Pago em ${fmtData(st.data_pgto)}</div>`:'<div style="font-size:11px;color:var(--am)">⏳ Aguardando pagamento</div>'}
-      </div>
-      ${isPago
-        ? `<button class="btn btn-ghost btn-sm" onclick="setFechStatus('${t.id}','${mes}','a_pagar')">↩ Marcar como pendente</button>`
-        : `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-            <div class="field" style="margin-bottom:0">
-              <label>Data do pagamento</label>
-              <input type="date" id="data-pgto" style="padding:6px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:12px"/>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="marcarPago('${t.id}','${mes}')">✓ Marcar como pago</button>
-          </div>`
-      }
-    </div>`;
+    ${(()=>{
+      const tAdiant = totalAdiantamentos(t.id, mes);
+      const tGeral  = totalGeral(linhas, t.id, mes);
+      const totalDevido = Math.max(0, tGeral - tAdiant);
+      return renderPagamentos(t.id, mes, totalDevido);
+    })()}`;
 }
 
 // ── LANÇAMENTOS MANUAIS ──────────────────────────────────────────────────────

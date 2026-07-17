@@ -493,12 +493,14 @@ function carregarBackup(input){
   const file = input.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     const statusEl = document.getElementById('backup-status');
     try {
       const dados = JSON.parse(e.target.result);
       if(!dados.modulos) throw new Error('Arquivo inválido');
       statusEl.textContent = '⏳ Restaurando dados...';
+
+      // 1. Salvar no localStorage imediatamente
       let restaurados = 0;
       BACKUP_KEYS.forEach(function(item){
         if(dados.modulos[item.key] !== undefined){
@@ -506,9 +508,27 @@ function carregarBackup(input){
           restaurados++;
         }
       });
+
+      // 2. Enviar ao Firebase (aguardar até 8s se não estiver pronto)
+      let tentativas = 0;
+      while(!window.fsSet && tentativas < 16){ await new Promise(r=>setTimeout(r,500)); tentativas++; }
+      if(window.fsSet){
+        statusEl.textContent = '⏳ Enviando para a nuvem...';
+        let enviados = 0;
+        for(const item of BACKUP_KEYS){
+          if(dados.modulos[item.key] !== undefined){
+            try{
+              await window.fsSet(item.key, dados.modulos[item.key]);
+              enviados++;
+              statusEl.textContent = `⏳ Enviando... ${enviados}/${restaurados} módulos`;
+            }catch(err){ console.warn('Erro ao enviar:', item.key, err); }
+          }
+        }
+      }
+
       const dataBackup = dados.data ? new Date(dados.data).toLocaleString('pt-BR') : 'data desconhecida';
-      statusEl.textContent = '✅ ' + restaurados + ' módulo(s) restaurados · Backup de ' + dataBackup + ' · Recarregando...';
-      setTimeout(function(){ location.reload(); }, 1500);
+      statusEl.textContent = '✅ ' + restaurados + ' módulo(s) restaurados e enviados para a nuvem · Backup de ' + dataBackup + ' · Recarregando...';
+      setTimeout(function(){ location.reload(); }, 2000);
     } catch(err) {
       document.getElementById('backup-status').textContent = '❌ Erro: ' + err.message;
     }

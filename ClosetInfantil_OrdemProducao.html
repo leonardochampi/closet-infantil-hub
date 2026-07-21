@@ -1161,6 +1161,13 @@ function renderForm(){
       <div class="cols-3">
         <div class="field"><label>Data de criação</label><input type="date" value="${o.data_criacao||''}" oninput="salvarCampo('data_criacao',this.value)"/></div>
         <div class="field"><label>Prazo de entrega</label><input type="date" value="${o.prazo||''}" oninput="salvarCampo('prazo',this.value)"/></div>
+        <div class="field cols-span-2" style="grid-column:1/-1">
+          <label>Link da NF (Dropbox)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="url" value="${o.link_nf||''}" placeholder="Cole o link do Dropbox aqui..." oninput="salvarCampo('link_nf',this.value)" style="flex:1"/>
+            ${o.link_nf ? `<a href="${o.link_nf}" target="_blank" style="white-space:nowrap;padding:8px 14px;background:var(--bl2);color:var(--bl);border:1.5px solid var(--bl);border-radius:var(--r-sm);font-size:12px;font-weight:600;text-decoration:none;font-family:'Poppins',sans-serif">📄 Abrir NF</a>` : ''}
+          </div>
+        </div>
         <div class="field">
           <label>OP vinculada <span style="font-size:10px;color:var(--fe);font-weight:400">(body principal)</span></label>
           ${(()=>{

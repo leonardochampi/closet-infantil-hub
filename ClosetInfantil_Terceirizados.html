@@ -307,6 +307,14 @@ function somaRetornosParciais(etapa, mesAno){
   const soma = rp.filter(r=>r.mes===mesAno).reduce((s,r)=>s+(parseInt(r.qtd)||0),0);
   return soma > 0 ? soma : null;
 }
+function formatarTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length<=2)  return v.length?'('+v:'';
+  if(v.length<=7)  return '('+v.slice(0,2)+') '+v.slice(2);
+  if(v.length<=11) return '('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7);
+  return v;
+}
+
 function nomeMatch(fornecedor, nomeTerc){
   if(!fornecedor||!nomeTerc) return false;
   const f = fornecedor.trim().toLowerCase();
@@ -755,10 +763,28 @@ function renderMain(){
           <input type="text" value="${t.nome||''}" placeholder="Nome do terceirizado"
             oninput="salvarTerc('nome',this.value);document.querySelector('.terc-item.ativo .terc-nome').innerHTML=this.value||'<em style=opacity:.5>Sem nome</em>'"/>
         </div>
-        <div class="field"><label>Telefone / contato</label>
-          <input type="text" value="${t.telefone||''}" placeholder="(47) 9 0000-0000" oninput="salvarTerc('telefone',this.value)"/>
+        <div class="field"><label>Tipo</label>
+          <select onchange="salvarTerc('tipo',this.value);renderMain()">
+            <option value="externo"${(t.tipo||'externo')==='externo'?' selected':''}>Terceirizado externo</option>
+            <option value="assistente"${t.tipo==='assistente'?' selected':''}>Assistente interno</option>
+          </select>
         </div>
       </div>
+      <div class="cols-3" style="margin-top:8px">
+        <div class="field"><label>Telefone / contato</label>
+          <input type="text" value="${formatarTelefone(t.telefone||'')}" placeholder="(47) 9 0000-0000" maxlength="16"
+            oninput="this.value=formatarTelefone(this.value);salvarTerc('telefone',this.value)"/>
+        </div>
+        ${t.tipo==='assistente'?`
+        <div class="field"><label>Valor por hora (R$)</label>
+          <input type="number" value="${t.valor_hora||''}" min="0" step="0.01" placeholder="ex: 8,50" oninput="salvarTerc('valor_hora',parseFloat(this.value)||0)"/>
+        </div>
+        <div class="field"><label>Carga horária diária (h)</label>
+          <input type="number" value="${t.horas_dia||8}" min="1" max="24" step="0.5" placeholder="ex: 8" oninput="salvarTerc('horas_dia',parseFloat(this.value)||8)"/>
+        </div>`:`
+        <div style="grid-column:span 2"></div>`}
+      </div>
+      ${t.tipo==='assistente'?'':`
       <div class="section-label" style="margin-top:4px">Serviços e valores</div>
       <div id="servicos-tags" style="margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -775,25 +801,25 @@ function renderMain(){
         </div>
         <div class="field" style="margin-bottom:0;flex:1;min-width:90px">
           <label>Pares/peça</label>
-          <input type="number" id="serv-pares" min="1" step="1" placeholder="1" title="Qtd de pares por peça (ex: botão = 2 para body, 3 para romper)"/>
+          <input type="number" id="serv-pares" min="1" step="1" placeholder="1"/>
         </div>
         <div class="field" style="margin-bottom:0;flex:1;min-width:110px">
-          <label>Valor por par (R$) <span style="font-size:10px;color:var(--fe);font-weight:400">(opcional)</span></label>
+          <label>Valor por par (R$)</label>
           <input type="number" id="serv-valor" min="0" step="0.01" placeholder="—"/>
         </div>
         <button class="btn btn-primary btn-sm" style="margin-bottom:0;align-self:flex-end" onclick="adicionarServico()">+ Adicionar</button>
-      </div>
+      </div>`}
     </div>
 
     <!-- Abas fechamento / por ordem -->
     <div class="tabs">
       <button class="tab${abaAtiva==='fechamento'?' on':''}" onclick="setAba('fechamento')">📅 Fechamento mensal</button>
-      <button class="tab${abaAtiva==='ordens'?' on':''}" onclick="setAba('ordens')">📋 Por ordem de produção</button>
+      ${t.tipo!=='assistente'?`<button class="tab${abaAtiva==='ordens'?' on':''}" onclick="setAba('ordens')">📋 Por ordem de produção</button>`:''}
     </div>
 
     <div id="aba-content"></div>
   `;
-  renderServicosTags();
+  if(t.tipo!=='assistente') renderServicosTags();
   renderAba();
 }
 
@@ -802,9 +828,267 @@ function setAba(aba){ abaAtiva=aba; renderAba(); document.querySelectorAll('.tab
 function renderAba(){
   const el = document.getElementById('aba-content');
   if(!el) return;
-  if(abaAtiva==='fechamento') el.innerHTML = renderFechamento();
-  else el.innerHTML = renderPorOrdem();
+  const t = terceirizados[tercAtivo];
+  if(t && t.tipo === 'assistente'){
+    el.innerHTML = renderFechamentoAssistente();
+  } else if(abaAtiva==='fechamento'){
+    el.innerHTML = renderFechamento();
+  } else {
+    el.innerHTML = renderPorOrdem();
+  }
 }
+
+// ── ASSISTENTE INTERNO ────────────────────────────────────────────────────────
+function getHorasLancadas(tercId, mes){
+  try{ const f=loadFech(); return f['horas_'+tercId+'_'+mes]||[]; }catch(e){ return []; }
+}
+function saveHorasLancadas(tercId, mes, items){
+  const f=loadFech(); f['horas_'+tercId+'_'+mes]=items; saveFech(f);
+}
+function totalHorasMes(tercId, mes){
+  return getHorasLancadas(tercId,mes).reduce((s,h)=>s+(parseFloat(h.horas)||0),0);
+}
+function renderFechamentoAssistente(){
+  const t = terceirizados[tercAtivo];
+  const valorHora = parseFloat(t.valor_hora)||0;
+  const meses = [];
+  const agora = new Date();
+  const mesAtualVal = agora.getFullYear()+'-'+String(agora.getMonth()+1).padStart(2,'0');
+  for(let i=-1; i<=12; i++){
+    const d = new Date(agora.getFullYear(), agora.getMonth()-i, 1);
+    const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][d.getMonth()]+' '+d.getFullYear();
+    meses.push({val, label});
+  }
+
+  return meses.map(m => {
+    const lancamentos = getHorasLancadas(t.id, m.val);
+    const totalH = totalHorasMes(t.id, m.val);
+    const totalR = totalH * valorHora;
+    const pags   = getPagamentos(t.id, m.val);
+    const tPago  = pags.reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
+    const saldo  = Math.max(0, totalR - tPago);
+    const quitado = tPago >= totalR && totalR > 0;
+    // Abrir por padrão apenas o mês atual
+    const aberto = m.val === mesAtualVal;
+    const idAcc  = `acc-${t.id}-${m.val}`;
+    const temDados = lancamentos.length > 0 || totalR > 0;
+
+    const bgHeader = quitado ? 'var(--gn2)' : temDados ? 'var(--pa2)' : '#f5f0ea';
+    const borderHeader = quitado ? 'var(--gn)' : 'var(--fe2)';
+    const saldoTxt = quitado
+      ? '<span style="color:var(--gn);font-weight:700">✅ Quitado</span>'
+      : temDados && saldo > 0
+        ? `<span style="color:var(--rd);font-weight:700">Saldo: R$ ${fmt2(saldo)}</span>`
+        : temDados ? '<span style="color:var(--am)">Pago</span>' : '<span style="color:var(--fe);font-size:11px">Sem lançamentos</span>';
+
+    return `
+      <div style="margin-bottom:6px;border-radius:var(--r-sm);overflow:hidden;border:1.5px solid ${borderHeader}">
+        <div onclick="toggleAccAssistente('${idAcc}')"
+          style="background:${bgHeader};padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="${idAcc}-chev" style="font-size:14px;transition:transform .2s;display:inline-block;transform:${aberto?'rotate(90deg)':'rotate(0deg)'}">▶</span>
+            <span style="font-size:13px;font-weight:700">${m.label}</span>
+            ${temDados?`<span style="font-size:11px;color:var(--ch2)">${totalH.toFixed(2)}h · R$ ${fmt2(totalR)}</span>`:''}
+          </div>
+          ${saldoTxt}
+        </div>
+        <div id="${idAcc}" style="display:${aberto?'block':'none'};background:var(--wh);padding:16px">
+          ${renderFormHoras(t.id, m.val, lancamentos, valorHora)}
+          ${temDados?renderPagamentos(t.id, m.val, totalR):''}
+          ${temDados?`<div style="margin-top:12px;text-align:right">
+            <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorioAssistente('${t.id}','${m.val}','${m.label}')">🖨 Imprimir relatório</button>
+          </div>`:''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleAccAssistente(id){
+  const el = document.getElementById(id);
+  const chev = document.getElementById(id+'-chev');
+  if(!el) return;
+  const aberto = el.style.display !== 'none';
+  el.style.display = aberto ? 'none' : 'block';
+  if(chev) chev.style.transform = aberto ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
+function renderFormHoras(tercId, mes, lancamentos, valorHora){
+  const totalH = lancamentos.reduce((s,h)=>s+(parseFloat(h.horas)||0),0);
+  const totalR = totalH * valorHora;
+  return `
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ch2);letter-spacing:.06em;margin-bottom:8px">🕐 Dias trabalhados</div>
+    ${lancamentos.length?`
+    <table class="fech-table" style="margin-bottom:10px;font-size:12px">
+      <thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Valor</th><th>Obs</th><th></th></tr></thead>
+      <tbody>
+        ${lancamentos.map(l=>`<tr>
+          <td style="white-space:nowrap">${l.data?new Date(l.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+          <td>${l.entrada||'—'}</td>
+          <td>${l.saida||'—'}</td>
+          <td style="font-weight:600">${(parseFloat(l.horas)||0).toFixed(2)}h</td>
+          <td style="color:var(--gn);font-weight:600">R$ ${fmt2((parseFloat(l.horas)||0)*valorHora)}</td>
+          <td>${l.obs||'—'}</td>
+          <td><button onclick="removerHora('${tercId}','${mes}','${l.id}')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:14px">×</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="background:var(--pa);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between">
+      <span style="font-size:12px;font-weight:600">Total: ${totalH.toFixed(2)}h</span>
+      <span style="font-size:13px;font-weight:700;color:var(--ch)">R$ ${fmt2(totalR)}</span>
+    </div>`:'<div style="font-size:11px;color:var(--fe2);font-style:italic;margin-bottom:8px">Nenhum dia lançado.</div>'}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="min-width:120px;margin-bottom:0"><label>Data</label><input type="date" id="hora-data-${tercId}-${mes}"/></div>
+      <div class="field" style="min-width:100px;margin-bottom:0"><label>Entrada</label><input type="time" id="hora-entrada-${tercId}-${mes}" oninput="calcHorasInput('${tercId}','${mes}')"/></div>
+      <div class="field" style="min-width:100px;margin-bottom:0"><label>Saída</label><input type="time" id="hora-saida-${tercId}-${mes}" oninput="calcHorasInput('${tercId}','${mes}')"/></div>
+      <div class="field" style="min-width:80px;margin-bottom:0"><label>Horas calc.</label><input type="text" id="hora-calc-${tercId}-${mes}" readonly style="background:var(--pa);font-weight:600;color:var(--gn)"/></div>
+      <div class="field" style="flex:2;min-width:120px;margin-bottom:0"><label>Observação</label><input type="text" id="hora-obs-${tercId}-${mes}" placeholder="Opcional"/></div>
+      <button class="btn btn-primary btn-sm" onclick="adicionarHora('${tercId}','${mes}')">+ Lançar</button>
+    </div>`;
+}
+
+function calcHorasInput(tercId, mes){
+  const entrada = document.getElementById(`hora-entrada-${tercId}-${mes}`)?.value;
+  const saida   = document.getElementById(`hora-saida-${tercId}-${mes}`)?.value;
+  const calcEl  = document.getElementById(`hora-calc-${tercId}-${mes}`);
+  if(!calcEl) return;
+  if(entrada && saida){
+    const [eh,em] = entrada.split(':').map(Number);
+    const [sh,sm] = saida.split(':').map(Number);
+    let mins = (sh*60+sm) - (eh*60+em);
+    if(mins < 0) mins += 24*60; // virada de meia-noite
+    const horas = mins/60;
+    calcEl.value = horas.toFixed(2)+'h';
+    calcEl._horas = horas;
+  } else {
+    calcEl.value = '';
+    calcEl._horas = 0;
+  }
+}
+
+function adicionarHora(tercId, mes){
+  const data    = document.getElementById(`hora-data-${tercId}-${mes}`)?.value||'';
+  const entrada = document.getElementById(`hora-entrada-${tercId}-${mes}`)?.value||'';
+  const saida   = document.getElementById(`hora-saida-${tercId}-${mes}`)?.value||'';
+  const calcEl  = document.getElementById(`hora-calc-${tercId}-${mes}`);
+  const horas   = calcEl?._horas || 0;
+  const obs     = document.getElementById(`hora-obs-${tercId}-${mes}`)?.value.trim()||'';
+  if(!horas){ alert('Informe a hora de entrada e saída.'); return; }
+  const items = getHorasLancadas(tercId, mes);
+  items.push({ id: Date.now().toString(36), data, entrada, saida, horas, obs });
+  saveHorasLancadas(tercId, mes, items);
+  renderAba();
+}
+
+function imprimirRelatorioAssistente(tercId, mes, mesLabel){
+  const t = terceirizados.find(x=>x.id===tercId);
+  if(!t) return;
+  const valorHora = parseFloat(t.valor_hora)||0;
+  const lancamentos = getHorasLancadas(tercId, mes);
+  const totalH = lancamentos.reduce((s,h)=>s+(parseFloat(h.horas)||0),0);
+  const totalR = totalH * valorHora;
+  const pags   = getPagamentos(tercId, mes);
+  const totalPago = pags.reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
+  const saldo  = Math.max(0, totalR - totalPago);
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+  <title>Relatório ${t.nome} · ${mesLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#333;padding:32px}
+    h1{font-size:18px;font-weight:700;margin-bottom:4px}
+    h2{font-size:13px;font-weight:700;margin:20px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #4A3524}
+    .logo-txt{font-size:11px;color:#B5916B;font-style:italic}
+    .info{font-size:11px;color:#666;margin-top:4px}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
+    th{background:#F2E4C9;padding:7px 10px;text-align:left;font-size:11px;font-weight:700;border:1px solid #D4B898}
+    td{padding:7px 10px;border:1px solid #e0d0b8;font-size:12px}
+    .num{text-align:right}
+    .total-row td{font-weight:700;background:#f8f4ee}
+    .resumo{background:#f8f4ee;border-radius:8px;padding:14px;margin-top:16px}
+    .resumo-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+    .resumo-row.destaque{font-weight:700;font-size:15px;border-top:1px solid #D4B898;margin-top:8px;padding-top:8px}
+    .ok{color:#3B6D11}
+    .rd{color:#991B1B}
+    .assinatura{margin-top:40px;display:flex;justify-content:space-between}
+    .assin-box{text-align:center;width:220px}
+    .assin-line{border-top:1px solid #333;margin-bottom:6px;margin-top:40px}
+    @media print{body{padding:20px}}
+  </style></head><body>
+  <div class="header">
+    <div>
+      <h1>${t.nome}</h1>
+      <div class="logo-txt">Closet Infantil · Assistente Interno</div>
+      <div class="info">Relatório de pagamento · ${mesLabel}</div>
+      <div class="info">Valor/hora: R$ ${fmt2(valorHora)} · Emitido em ${new Date().toLocaleDateString('pt-BR')}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:22px;font-weight:700;color:#4A3524">R$ ${fmt2(totalR)}</div>
+      <div style="font-size:11px;color:#666">${totalH.toFixed(2)}h trabalhadas</div>
+    </div>
+  </div>
+
+  <h2>Dias Trabalhados</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th class="num">Horas</th><th class="num">Valor</th><th>Observação</th></tr></thead>
+    <tbody>
+      ${lancamentos.length ? lancamentos.map(l=>`<tr>
+        <td>${l.data?new Date(l.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+        <td>${l.entrada||'—'}</td>
+        <td>${l.saida||'—'}</td>
+        <td class="num">${(parseFloat(l.horas)||0).toFixed(2)}h</td>
+        <td class="num">R$ ${fmt2((parseFloat(l.horas)||0)*valorHora)}</td>
+        <td>${l.obs||'—'}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#999">Nenhum lançamento</td></tr>'}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="3"><strong>TOTAL</strong></td>
+        <td class="num">${totalH.toFixed(2)}h</td>
+        <td class="num">R$ ${fmt2(totalR)}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  ${pags.length?`<h2>Pagamentos Realizados</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Observação</th><th class="num">Valor</th></tr></thead>
+    <tbody>${pags.map(p=>`<tr>
+      <td>${p.data?new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+      <td>${p.obs||'—'}</td>
+      <td class="num ok">R$ ${fmt2(p.valor)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`:''}
+
+  <div class="resumo">
+    <div class="resumo-row"><span>Total a receber</span><span>R$ ${fmt2(totalR)}</span></div>
+    <div class="resumo-row ok"><span>Total pago</span><span>R$ ${fmt2(totalPago)}</span></div>
+    <div class="resumo-row destaque ${saldo>0?'rd':'ok'}"><span>Saldo</span><span>${saldo>0?'R$ '+fmt2(saldo)+' pendente':'✅ Quitado'}</span></div>
+  </div>
+
+  <div class="assinatura">
+    <div class="assin-box"><div class="assin-line"></div><div>${t.nome}</div><div style="font-size:10px;color:#666">Assistente</div></div>
+    <div class="assin-box"><div class="assin-line"></div><div>Closet Infantil</div><div style="font-size:10px;color:#666">Responsável</div></div>
+  </div>
+
+  <script>window.onload=function(){window.print()}<\/script>
+  </body></html>`;
+
+  const blob = new Blob([html], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if(win) win.onload = ()=>{ win.print(); setTimeout(()=>URL.revokeObjectURL(url),5000); };
+  else { setTimeout(()=>URL.revokeObjectURL(url),5000); }
+}
+
+function removerHora(tercId, mes, id){
+  const items = getHorasLancadas(tercId, mes).filter(h=>h.id!==id);
+  saveHorasLancadas(tercId, mes, items);
+  renderAba();
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function renderFechamento(){
   const t = terceirizados[tercAtivo];

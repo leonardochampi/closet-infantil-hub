@@ -449,6 +449,16 @@ function popularMeses(){
   }
 }
 
+function getHorasLancadas(tercId, mes){
+  try{ const f=loadFech(); return f['horas_'+tercId+'_'+mes]||[]; }catch(e){ return []; }
+}
+function totalHorasMes(tercId, mes){
+  return getHorasLancadas(tercId,mes).reduce((s,h)=>s+(parseFloat(h.horas)||0),0);
+}
+function totalAssistenteMes(tercId, mes, valorHora){
+  return totalHorasMes(tercId, mes) * (parseFloat(valorHora)||0);
+}
+
 function renderDashboard(){
   const mes = document.getElementById('sel-mes').value;
   const tercs = loadTerc();
@@ -459,8 +469,19 @@ function renderDashboard(){
     return;
   }
 
-  const dados = tercs.map((t,i)=>({t, i, ...calcularTotalTerceirizado(i,mes), ap:calcularAProduzir(i,mes), st:getFechStatus(t.id,mes)}));
-  const totalGeral   = dados.reduce((s,d)=>s+d.totalGeral,0);
+  const dados = tercs
+    .filter(t => t.tipo !== 'assistente')
+    .map((t,i)=>({t, i: tercs.indexOf(t), ...calcularTotalTerceirizado(tercs.indexOf(t),mes), ap:calcularAProduzir(tercs.indexOf(t),mes), st:getFechStatus(t.id,mes)}));
+
+  const assistentes = tercs
+    .filter(t => t.tipo === 'assistente')
+    .map(t => ({
+      t, i: tercs.indexOf(t),
+      totalGeral: totalAssistenteMes(t.id, mes, t.valor_hora),
+      totalH: totalHorasMes(t.id, mes),
+      st: getFechStatus(t.id, mes),
+    }));
+  const totalGeral   = dados.reduce((s,d)=>s+d.totalGeral,0) + assistentes.reduce((s,a)=>s+a.totalGeral,0);
   const totalAProd   = dados.reduce((s,d)=>s+d.ap.total,0);
   const totalPago    = dados.filter(d=>d.st.status==='pago').reduce((s,d)=>s+d.totalGeral,0);
   const totalPendente= totalGeral - totalPago;
@@ -592,6 +613,44 @@ function renderDashboard(){
     </div>`;
     gridHtml += membros.map(renderCard).join('');
   });
+
+  // Cards de assistentes internos
+  if(assistentes.length){
+    const totalAssist = assistentes.reduce((s,a)=>s+a.totalGeral,0);
+    gridHtml += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:12px;margin-top:8px;margin-bottom:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--fe);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">👩‍💼 Assistente Interno</div>
+      <div style="flex:1;height:1px;background:var(--fe2)"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--ch);white-space:nowrap">R$ ${fmt2(totalAssist)}</div>
+    </div>`;
+    gridHtml += assistentes.map(a => {
+      const tPago = totalPagoParc(a.t.id, mes);
+      const saldo = Math.max(0, a.totalGeral - tPago);
+      const quitado = tPago >= a.totalGeral && a.totalGeral > 0;
+      const temDados = a.totalGeral > 0;
+      return `<div class="terc-card ${temDados?'pendente':'sem-lancamento'}">
+        <div class="terc-header">
+          <div>
+            <div class="terc-nome">${a.t.nome||'—'}</div>
+            <div class="terc-etapa">👩‍💼 Assistente · ${a.totalH.toFixed(1)}h · R$ ${fmt2(parseFloat(a.t.valor_hora)||0)}/h</div>
+            <span class="badge-st ${quitado?'badge-pago':temDados?'badge-parcial':'badge-vazio'}">${quitado?'✅ Pago':temDados?'⏳ Pendente':'Sem lançamentos'}</span>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;opacity:.6">Total do mês</div>
+            <div class="terc-valor">R$ ${fmt2(a.totalGeral)}</div>
+          </div>
+        </div>
+        ${temDados&&!quitado?`<div style="padding:10px 16px;background:var(--rd2);border-bottom:1px solid var(--fe2)">
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span>Pago: <strong style="color:var(--gn)">R$ ${fmt2(tPago)}</strong></span>
+            <span>Saldo: <strong style="color:var(--rd)">R$ ${fmt2(saldo)}</strong></span>
+          </div>
+        </div>`:''}
+        <div class="terc-body">
+          <a href="ClosetInfantil_Terceirizados.html?tercIdx=${a.i}" class="btn btn-primary" style="font-size:10px;padding:5px 12px;text-decoration:none">Ver detalhes</a>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   if(semLancamento.length){
     gridHtml += `<div style="grid-column:1/-1;font-size:11px;color:var(--fe);margin-top:12px;padding-top:12px;border-top:1px solid var(--fe2)">${semLancamento.map(d=>`<span style="margin-right:12px">${d.t.nome}</span>`).join('')} — sem lançamentos no mês</div>`;

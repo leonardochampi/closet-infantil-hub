@@ -517,13 +517,13 @@ function renderDashboard(){
     </div>
     ${totalDeduzido>0?`
     <div style="border-top:1px solid rgba(250,239,218,.15);margin-top:16px;padding-top:14px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.8;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.9;margin-bottom:8px">
         <span>💸 Adiantamentos + parcial</span>
-        <span style="color:#fca5a5">− R$ ${fmt2(totalDeduzido)}</span>
+        <span style="color:#f87171;font-weight:600">− R$ ${fmt2(totalDeduzido)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span style="font-size:14px;font-weight:600">Líquido a pagar</span>
-        <span style="font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#86efac">R$ ${fmt2(liquidoAPagar)}</span>
+        <span style="font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#4ade80">R$ ${fmt2(liquidoAPagar)}</span>
       </div>
     </div>`:''}
     `;

@@ -488,6 +488,14 @@ function renderDashboard(){
   const nPago = dados.filter(d=>d.st.status==='pago'&&d.totalGeral>0).length;
   const nAP   = dados.filter(d=>d.st.status!=='pago'&&d.totalGeral>0).length;
 
+  // Total de adiantamentos e pagamentos parciais (terceirizados + assistentes)
+  const totalAdiantTodos = dados.reduce((s,d)=>s+totalAdiantamentos(d.t.id,mes),0)
+                          + assistentes.reduce((s,a)=>s+totalAdiantamentos(a.t.id,mes),0);
+  const totalParcialTodos = dados.reduce((s,d)=>s+totalPagoParc(d.t.id,mes),0)
+                          + assistentes.reduce((s,a)=>s+totalPagoParc(a.t.id,mes),0);
+  const totalDeduzido = totalAdiantTodos + totalParcialTodos;
+  const liquidoAPagar = Math.max(0, totalGeral - totalDeduzido);
+
   // Total geral
   document.getElementById('total-geral-wrap').innerHTML = `
     <div class="total-geral">
@@ -500,15 +508,25 @@ function renderDashboard(){
         <div>
           <div style="font-size:10px;opacity:.7;margin-bottom:3px">✅ Concluído</div>
           <div style="font-size:18px;font-weight:700;color:var(--gn2)">R$ ${fmt2(totalGeral)}</div>
-          <div style="font-size:10px;opacity:.6;margin-top:2px">Pago: R$ ${fmt2(totalPago)} · Pendente: R$ ${fmt2(totalPendente)}</div>
         </div>
         <div>
           <div style="font-size:10px;opacity:.7;margin-bottom:3px">🔧 A produzir</div>
           <div style="font-size:18px;font-weight:700;color:var(--am2)">R$ ${fmt2(totalAProd)}</div>
-          <div style="font-size:10px;opacity:.6;margin-top:2px">Estimado</div>
         </div>
       </div>
-    </div>`;
+    </div>
+    ${totalDeduzido>0?`
+    <div style="border-top:1px solid rgba(250,239,218,.15);margin-top:16px;padding-top:14px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.8;margin-bottom:8px">
+        <span>💸 Adiantamentos + parcial</span>
+        <span style="color:#fca5a5">− R$ ${fmt2(totalDeduzido)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:14px;font-weight:600">Líquido a pagar</span>
+        <span style="font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#86efac">R$ ${fmt2(liquidoAPagar)}</span>
+      </div>
+    </div>`:''}
+    `;
 
   // Grid de terceirizados
   // Ordenar terceirizados pela etapa principal (ordem da OP)

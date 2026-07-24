@@ -2,6 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -475,16 +478,41 @@ function calcularFechamento(tercIdx, mesAno){
             const servicoNome = op.talh.servico||'';
             const sMatch = servicosTalh.find(s=>servicoNome&&(s.desc||'').toLowerCase()===servicoNome.toLowerCase())
               || servicosTalh[0] || null;
+            const ehConjunto = (op.tipo_peca||'')==='conjunto';
             if(sMatch){
-              linhas.push({
-                cod: op.cod||'—', produto: op.produto||'—',
-                etapa: 'Talhação', desc: sMatch.desc||servicoNome,
-                data: op.talh.data_retorno_real,
-                qtd: total, pares: sMatch.pares||1,
-                vUnit: sMatch.valor*(sMatch.pares||1),
-                valor: total*sMatch.valor*(sMatch.pares||1),
-                multiplo: false, op_id: op.id, etapa_id: 'talh',
-              });
+              const vUnitTotal = sMatch.valor*(sMatch.pares||1);
+              if(ehConjunto){
+                // Separar visualmente em Body + Calça, cada um com metade do valor
+                const vUnitMetade = vUnitTotal/2;
+                linhas.push({
+                  cod: op.cod||'—', produto: op.produto||'—',
+                  etapa: 'Talhação', desc: (sMatch.desc||servicoNome)+' · Body',
+                  data: op.talh.data_retorno_real,
+                  qtd: total, pares: sMatch.pares||1,
+                  vUnit: vUnitMetade,
+                  valor: total*vUnitMetade,
+                  multiplo: false, op_id: op.id, etapa_id: 'talh',
+                });
+                linhas.push({
+                  cod: op.cod||'—', produto: op.produto||'—',
+                  etapa: 'Talhação', desc: (sMatch.desc||servicoNome)+' · Calça',
+                  data: op.talh.data_retorno_real,
+                  qtd: total, pares: sMatch.pares||1,
+                  vUnit: vUnitMetade,
+                  valor: total*vUnitMetade,
+                  multiplo: false, op_id: op.id, etapa_id: 'talh',
+                });
+              } else {
+                linhas.push({
+                  cod: op.cod||'—', produto: op.produto||'—',
+                  etapa: 'Talhação', desc: sMatch.desc||servicoNome,
+                  data: op.talh.data_retorno_real,
+                  qtd: total, pares: sMatch.pares||1,
+                  vUnit: vUnitTotal,
+                  valor: total*vUnitTotal,
+                  multiplo: false, op_id: op.id, etapa_id: 'talh',
+                });
+              }
             } else {
               // Múltiplos serviços sem identificação: linha única amarela para ajuste manual
               const s0 = servicosTalh[0];

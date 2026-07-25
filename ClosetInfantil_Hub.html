@@ -515,18 +515,50 @@ function carregarBackup(input){
       });
       
       if(restaurados === 0) throw new Error('Nenhum dado encontrado no arquivo.');
-      
+
+      // Verificar e corrigir códigos de OP duplicados
+      let duplicatasCorrigidas = 0;
+      if(dados.modulos['ci_ordens_producao']){
+        const ordens = dados.modulos['ci_ordens_producao'];
+        const codsVistos = new Set();
+        let maxSeq = parseInt(dados.modulos['ci_lote_seq']||'0')||0;
+        ordens.forEach(op => {
+          if(op.cod && codsVistos.has(op.cod)){
+            // Código duplicado: gerar um novo
+            const ano = new Date().getFullYear().toString().slice(2);
+            maxSeq++;
+            const novoCod = 'CI-'+ano+'-'+String(maxSeq).padStart(4,'0');
+            op.cod = novoCod;
+            codsVistos.add(novoCod);
+            duplicatasCorrigidas++;
+          } else if(op.cod){
+            codsVistos.add(op.cod);
+            const m = op.cod.match(/CI-\d{2}-(\d+)/);
+            if(m) maxSeq = Math.max(maxSeq, parseInt(m[1]));
+          }
+        });
+        if(duplicatasCorrigidas > 0){
+          localStorage.setItem('ci_ordens_producao', JSON.stringify(ordens));
+          localStorage.setItem('ci_lote_seq', String(maxSeq));
+        }
+      }
+
       const dataBackup = dados.data
         ? new Date(dados.data).toLocaleString('pt-BR')
         : 'data desconhecida';
-      
-      statusEl.textContent = '✅ ' + restaurados + ' módulos restaurados (backup de ' + dataBackup + '). Sincronizando com nuvem e recarregando...';
-      
+
+      statusEl.textContent = '✅ ' + restaurados + ' módulos restaurados' +
+        (duplicatasCorrigidas>0 ? ' · ' + duplicatasCorrigidas + ' código(s) de OP duplicado(s) corrigido(s)' : '') +
+        ' (backup de ' + dataBackup + '). Sincronizando com nuvem e recarregando...';
+
       // Enviar ao Firebase em background (não bloqueia o reload)
       if(window.fsSet){
         BACKUP_KEYS.forEach(function(item){
+          const valorAtual = item.key === 'ci_ordens_producao' ? JSON.parse(localStorage.getItem('ci_ordens_producao')||'[]')
+            : item.key === 'ci_lote_seq' ? localStorage.getItem('ci_lote_seq')
+            : dados.modulos[item.key];
           if(dados.modulos[item.key] !== undefined){
-            window.fsSet(item.key, dados.modulos[item.key]).catch(function(){});
+            window.fsSet(item.key, valorAtual).catch(function(){});
           }
         });
       }

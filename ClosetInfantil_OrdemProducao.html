@@ -308,6 +308,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     <div class="painel col-lista">
       <div class="painel-title">Ordens de Produção <span class="badge-count" id="badge-count">0</span></div>
       <button class="btn-nova" onclick="novaOrdem()">+ Nova ordem</button>
+      <button class="btn-nova" id="btn-modo-consolidar" onclick="toggleModoConsolidar()" style="border-color:var(--bl);color:var(--bl)">🔗 Consolidar OPs</button>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <select id="filtro-status" onchange="renderLista()" style="flex:0 0 auto;width:90px;padding:6px 8px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:11px;color:var(--ch);background:var(--wh)">
           <option value="abertas">Abertas</option>
@@ -389,10 +390,20 @@ const SEQ_KEY = 'ci_lote_seq';
 function loadOrdens(){ try{ return _lsGet(OP_KEY, []) }catch(e){ return [] } }
 function saveOrdens(o){ try{ _lsSet(OP_KEY, o) }catch(e){} }
 function nextSeq(){
-  let n = 1;
-  try{ n = parseInt(_lsGet(SEQ_KEY, null)||'0') + 1; localStorage.setItem(SEQ_KEY, String(n)); }catch(e){ n = (Date.now()%9999)+1; }
   const ano = new Date().getFullYear().toString().slice(2);
-  return 'CI-'+ano+'-'+String(n).padStart(4,'0');
+  let n = 1;
+  try{ n = parseInt(_lsGet(SEQ_KEY, null)||'0') + 1; }catch(e){ n = 1; }
+
+  // Garantir que o número não colide com nenhuma OP já existente
+  const codigosExistentes = new Set(ordens.map(o=>o.cod));
+  let cod = 'CI-'+ano+'-'+String(n).padStart(4,'0');
+  while(codigosExistentes.has(cod)){
+    n++;
+    cod = 'CI-'+ano+'-'+String(n).padStart(4,'0');
+  }
+
+  try{ localStorage.setItem(SEQ_KEY, String(n)); }catch(e){}
+  return cod;
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -1034,6 +1045,19 @@ function renderLista(){
   el.innerHTML = lista.map(o => {
     const prog = progresso(o);
     const total = totalGrade(o.grade);
+    const selecionada = _consolidarSelecionadas.includes(o._i);
+    if(_modoConsolidar){
+      return `<div class="ordem-item${selecionada?' ativa':''}" onclick="toggleConsolidarSelecao(${o._i})" style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:18px;height:18px;border-radius:5px;border:2px solid var(--fe);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;${selecionada?'background:var(--ch);border-color:var(--ch);color:var(--pa)':'background:var(--wh)'}">${selecionada?'✓':''}</div>
+        <div style="flex:1">
+          <div class="ordem-item-ref">
+            <span style="font-size:9px;font-weight:400;color:var(--fe);margin-right:5px">${o.cod||''}</span>
+            ${o.produto||'<em style="opacity:.5;font-size:11px">Sem produto</em>'}
+          </div>
+          <div class="ordem-item-meta"><span>${total} pç</span><span>${(o.grade_tamanhos||[]).join(' ')}</span></div>
+        </div>
+      </div>`;
+    }
     return `<div class="ordem-item${o._i===ordemAtiva?' ativa':''}" onclick="selecionarOrdem(${o._i})">
       <div class="ordem-item-ref">
         <span style="font-size:9px;font-weight:400;color:var(--fe);margin-right:5px">${o.cod||''}</span>
@@ -1044,6 +1068,183 @@ function renderLista(){
       <div class="ordem-item-prog"><div class="ordem-item-bar" style="width:${prog}%"></div></div>
     </div>`;
   }).join('');
+
+  if(_modoConsolidar) renderBarraConsolidar();
+}
+
+// ── CONSOLIDAÇÃO DE OPs ──────────────────────────────────────────────────────
+let _modoConsolidar = false;
+let _consolidarSelecionadas = [];
+
+function toggleModoConsolidar(){
+  _modoConsolidar = !_modoConsolidar;
+  _consolidarSelecionadas = [];
+  const btn = document.getElementById('btn-modo-consolidar');
+  if(btn){
+    btn.textContent = _modoConsolidar ? '✕ Cancelar consolidação' : '🔗 Consolidar OPs';
+    btn.style.background = _modoConsolidar ? 'var(--bl2)' : 'none';
+  }
+  renderLista();
+}
+
+function toggleConsolidarSelecao(idx){
+  const i = _consolidarSelecionadas.indexOf(idx);
+  if(i>=0) _consolidarSelecionadas.splice(i,1);
+  else _consolidarSelecionadas.push(idx);
+  renderLista();
+}
+
+function renderBarraConsolidar(){
+  const el = document.getElementById('lista-ordens');
+  const n = _consolidarSelecionadas.length;
+  const barra = document.createElement('div');
+  barra.style.cssText = 'position:sticky;bottom:0;background:var(--wh);border-top:1.5px solid var(--fe2);padding:10px;margin-top:10px';
+  barra.innerHTML = `<button onclick="abrirModalConsolidar()" ${n<2?'disabled':''} style="width:100%;padding:10px;background:${n<2?'var(--pa2)':'var(--ch)'};color:${n<2?'var(--fe)':'var(--pa)'};border:none;border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:${n<2?'default':'pointer'}">🔗 Consolidar ${n} OP${n!==1?'s':''} selecionada${n!==1?'s':''}</button>`;
+  el.parentNode.appendChild(barra);
+}
+
+function abrirModalConsolidar(){
+  if(_consolidarSelecionadas.length < 2) return;
+  const ops = _consolidarSelecionadas.map(i=>ordens[i]);
+  const tamanhos = ops[0].grade_tamanhos || ['RN','P','M','G','GG'];
+  const gradeSum = {};
+  tamanhos.forEach(t => gradeSum[t] = ops.reduce((s,o)=>s+(parseInt(o.grade?.[t])||0),0));
+  const totalSum = Object.values(gradeSum).reduce((s,v)=>s+v,0);
+  const nomeSugerido = (ops[0].produto||'PRODUTO') + ' - CONSOLIDADO';
+
+  const modalHtml = `
+    <div id="modal-consolidar-overlay" style="position:fixed;inset:0;background:rgba(74,53,36,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this) fecharModalConsolidar()">
+      <div style="background:var(--wh);border-radius:var(--r);box-shadow:var(--shadow);padding:28px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto">
+        <div style="font-family:'Fraunces',serif;font-size:17px;color:var(--ch);margin-bottom:4px">Consolidar Ordens de Produção</div>
+        <div style="font-size:12px;color:var(--fe);margin-bottom:18px">As OPs selecionadas serão somadas em uma nova OP</div>
+
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          <thead><tr>
+            <th style="background:var(--pa2);padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ch2);text-align:left">Ordem</th>
+            <th style="background:var(--pa2);padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ch2);text-align:left">Produto</th>
+            <th style="background:var(--pa2);padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ch2);text-align:right">Qtd</th>
+          </tr></thead>
+          <tbody>
+            ${ops.map(o=>`<tr>
+              <td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--pa2)">${o.cod||'—'}</td>
+              <td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--pa2)">${o.produto||'—'}</td>
+              <td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--pa2);text-align:right;font-weight:600">${totalGrade(o.grade)}</td>
+            </tr>`).join('')}
+            <tr style="background:var(--pa)">
+              <td colspan="2" style="padding:8px 10px;font-size:12px;font-weight:700">Total consolidado</td>
+              <td style="padding:8px 10px;font-size:12px;font-weight:700;text-align:right">${totalSum}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="field">
+          <label>Nome da OP consolidada</label>
+          <input type="text" id="nome-consolidada" value="${nomeSugerido}"/>
+        </div>
+
+        <div style="background:var(--bl2);border-radius:var(--r-sm);padding:12px 14px;font-size:11px;color:var(--bl);margin-bottom:18px;line-height:1.5">
+          ℹ️ As OPs originais (${ops.map(o=>o.cod).join(', ')}) continuam existindo normalmente para histórico de produção.
+          A nova OP consolidada é a que você vai vincular na outra peça (ex: calça/bermuda) no campo "OP vinculada".
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button onclick="fecharModalConsolidar()" style="flex:1;padding:11px;background:var(--wh);border:1.5px solid var(--fe2);border-radius:var(--r-sm);color:var(--ch2);font-weight:600;font-size:13px;cursor:pointer;font-family:'Poppins',sans-serif">Cancelar</button>
+          <button onclick="confirmarConsolidacao()" style="flex:2;padding:11px;background:var(--ch);color:var(--pa);border:none;border-radius:var(--r-sm);font-weight:700;font-size:13px;cursor:pointer;font-family:'Poppins',sans-serif">✓ Criar OP consolidada</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function fecharModalConsolidar(){
+  const el = document.getElementById('modal-consolidar-overlay');
+  if(el) el.remove();
+}
+
+function confirmarConsolidacao(){
+  const opsIdx = [..._consolidarSelecionadas];
+  const ops = opsIdx.map(i=>ordens[i]);
+  const nome = document.getElementById('nome-consolidada').value.trim() || (ops[0].produto+' - CONSOLIDADO');
+  const tamanhos = ops[0].grade_tamanhos || ['RN','P','M','G','GG'];
+  const gradeSum = {};
+  tamanhos.forEach(t => gradeSum[t] = ops.reduce((s,o)=>s+(parseInt(o.grade?.[t])||0),0));
+
+  const cod = nextSeq();
+  const opBase = ops[0];
+
+  // Herdar dados da Revisão/Embalagem já preenchidos em alguma das OPs originais
+  let revHerdada = null;
+  for(const op of ops){
+    const etRev = op.etapas?.find(e=>e.id==='rev');
+    if(etRev && (etRev.fornecedor || etRev.status!=='aguardando')){
+      revHerdada = etRev;
+      break;
+    }
+  }
+
+  const nova = {
+    id: genId(), cod,
+    produto: nome,
+    data_criacao: new Date().toISOString().slice(0,10),
+    tipo_peca: opBase.tipo_peca || 'body',
+    grade_tamanhos: tamanhos,
+    grade: gradeSum,
+    consolidada_de: ops.map(o=>o.cod),
+    apenas_vinculo: true,
+    etapas: [
+      { id:'rev',  nome:'Revisão / Embalagem', tipo:'revisao', status:'aguardando', data_envio:'', data_inicio:'', data_retorno_real:'', obs:'', ck:{}, ativa:true, imprimir:true,
+        fornecedor: revHerdada?.fornecedor||'',
+        status: revHerdada?.status||'aguardando',
+        data_envio: revHerdada?.data_envio||'',
+        data_inicio: revHerdada?.data_inicio||'',
+        data_retorno_real: revHerdada?.data_retorno_real||'',
+        mes_fechamento: revHerdada?.mes_fechamento||'',
+        servico: revHerdada?.servico||'',
+      },
+      { id:'conf', nome:'Conferência Interna',  tipo:'conferencia', fornecedor:'', status:'aguardando', data_envio:'', data_inicio:'', data_retorno_real:'', obs:'', ck:{}, ativa:false, imprimir:false },
+    ],
+    obs: `OP DE VÍNCULO — só tem etapa de Revisão/Embalagem. Consolida: ${ops.map(o=>o.cod+' ('+totalGrade(o.grade)+' pç)').join(' + ')}. Talhação, costura e botão ficam nas OPs originais.${revHerdada?' Dados de Revisão/Embalagem herdados automaticamente.':''}`,
+    concluida: false,
+  };
+
+  // Desativar Revisão/Embalagem e Conferência nas OPs originais
+  // (evita contar duas vezes: a OP consolidada é quem representa o par na Revisão)
+  ops.forEach(op => {
+    op.etapas?.forEach(etapa => {
+      if(etapa.id === 'rev' || etapa.id === 'conf'){
+        etapa._ativa_antes_consolidar = etapa.ativa; // guarda estado original, caso precise reverter
+        etapa.ativa = false;
+      }
+    });
+  });
+
+  // Transferir vínculo automaticamente: se alguma OP (ex: bermuda/calça) apontava
+  // para uma das OPs consolidadas, passa a apontar para a nova OP consolidada
+  const codsOriginais = ops.map(o=>o.cod);
+  let opsTransferidas = [];
+  ordens.forEach(op => {
+    if(op.op_vinculada && codsOriginais.includes(op.op_vinculada)){
+      op.op_vinculada = cod;
+      opsTransferidas.push(op.cod);
+    }
+  });
+
+  ordens.unshift(nova);
+  saveOrdens(ordens);
+
+  fecharModalConsolidar();
+  toggleModoConsolidar();
+  ordemAtiva = 0;
+  renderLista();
+  renderForm();
+  abrirDetalhe();
+
+  const avisos = [];
+  if(revHerdada) avisos.push(`📋 Dados da Revisão/Embalagem herdados${revHerdada.fornecedor?' de '+revHerdada.fornecedor:''}.`);
+  if(opsTransferidas.length) avisos.push(`🔗 Vínculo transferido: ${opsTransferidas.join(', ')} agora aponta para ${cod}.`);
+  if(avisos.length){
+    setTimeout(()=>alert(`✅ OP consolidada criada!\n\n${avisos.join('\n')}`), 300);
+  }
 }
 
 // ── RENDER FORM ───────────────────────────────────────────────────────────────
@@ -1122,7 +1323,7 @@ function renderForm(){
   document.getElementById('form-wrap').innerHTML = `
     <div class="form-header">
       <div>
-        <div class="lote-badge" style="margin-bottom:8px">#️⃣ ${o.cod||'—'}</div>
+        <div class="lote-badge" style="margin-bottom:8px">#️⃣ ${o.cod||'—'}${o.apenas_vinculo?' <span style="background:var(--bl);color:#fff;font-size:9px;padding:2px 8px;border-radius:8px;margin-left:6px;vertical-align:middle">SÓ VÍNCULO</span>':''}</div>
         <div class="form-title">${o.produto||'Nova ordem'}</div>
       </div>
       <div class="form-actions">
@@ -1131,6 +1332,11 @@ function renderForm(){
         <button class="btn btn-danger" onclick="excluirOrdem()">Excluir</button>
       </div>
     </div>
+
+    ${o.apenas_vinculo?`<div style="background:var(--bl2);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:16px;font-size:12px;color:var(--bl);line-height:1.6">
+      ℹ️ <strong>Esta OP só existe para a Revisão/Embalagem.</strong> Preencha o fornecedor abaixo — é essa etapa que vai gerar o custo pareado da Bermudinha/Calça vinculada a ela.
+      <br/>Talhação, costura e botão continuam nas OPs originais: <strong>${(o.consolidada_de||[]).join(', ')}</strong> (com Revisão/Embalagem desativada nelas para não duplicar).
+    </div>`:''}
 
     <div class="prog-bar-wrap">
       <div class="prog-label"><span>Progresso geral</span><span id="prog-label">${prog}% concluído</span></div>
@@ -1216,7 +1422,7 @@ function renderForm(){
 
     <div class="section">
       <div class="section-label">Etapas de produção</div>
-      ${etapasHtml}
+      ${o.etapas.length ? etapasHtml : '<div style="text-align:center;padding:24px;color:var(--fe);font-style:italic;font-size:12px">Esta OP não tem etapas — é apenas um vínculo para o fechamento.</div>'}
     </div>
 
     <div class="section">

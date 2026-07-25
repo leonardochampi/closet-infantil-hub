@@ -459,8 +459,9 @@ function calcularFechamento(tercIdx, mesAno){
   ordens.forEach(op => {
     // Detectar se esta OP é "principal" de embalagem: outra OP aponta para ela como vinculada
     const opSecundaria = ordens.find(x => x.op_vinculada === op.cod && x.id !== op.id);
-    const codDisplay = opSecundaria ? `${op.cod} + ${opSecundaria.cod}` : (op.cod||'—');
-    const produtoDisplay = opSecundaria ? `${op.produto||'—'} + ${opSecundaria.produto||'—'}` : (op.produto||'—');
+    const codDisplay = op.cod || '—';
+    const codVinculado = opSecundaria ? opSecundaria.cod : null;
+    const produtoDisplay = op.produto||'—';
 
     // Verificar talhação da OP
     if(op.talh && op.talh.status==='concluido' && op.talh.fornecedor){
@@ -617,8 +618,9 @@ function calcularFechamento(tercIdx, mesAno){
       const pushLinha = (srv, qtdPrincipal, descExtra) => {
         if(!srv) return;
         linhas.push({
-          cod: (etapa.id==='rev'||etapa.id==='conf') ? codDisplay : (op.cod||'—'),
-          produto: (etapa.id==='rev'||etapa.id==='conf') ? produtoDisplay : (op.produto||'—'),
+          cod: codDisplay,
+          codVinc: (etapa.id==='rev'||etapa.id==='conf') ? codVinculado : null,
+          produto: op.produto||'—',
           etapa: ETAPA_LABELS[etapa.id]||etapa.id,
           desc: descExtra || (servicoMatch?servicoMatch.desc||servicoNome:srv.desc||''),
           data: etapa.data_retorno_real,
@@ -658,7 +660,9 @@ function calcularFechamento(tercIdx, mesAno){
         // Múltiplos serviços sem identificação: linha para ajuste manual
         servicos.forEach(s=>{
           linhas.push({
-            cod: (etapa.id==='rev'||etapa.id==='conf') ? codDisplay : (op.cod||'—'), produto: (etapa.id==='rev'||etapa.id==='conf') ? produtoDisplay : (op.produto||'—'),
+            cod: codDisplay,
+            codVinc: (etapa.id==='rev'||etapa.id==='conf') ? codVinculado : null,
+            produto: op.produto||'—',
             etapa: ETAPA_LABELS[etapa.id]||etapa.id,
             desc: s.desc||'',
             data: etapa.data_retorno_real,
@@ -1191,7 +1195,8 @@ function calcularAProduzirTerc(tercIdx, mesAno){
       let total=gradeTotal;
       if(etapa.tipo==='revisao'&&opSec){const tams2=op.grade_tamanhos||[];total=tams2.reduce((s,tam)=>s+Math.min(parseInt(op.grade?.[tam]||0),parseInt(opSec.grade?.[tam]||0)),0);}
       const s1=findServPorTipo(t.servicos, op.tipo_peca||'conjunto', etapa.id)||servicos[0];
-      if(s1) linhas.push({cod:op.cod,produto:op.produto,etapa:ETAPA_LABELS[etapa.id]||etapa.id,desc:'',data:etapa.data_retorno_real,qtd:total,pares:s1.pares||1,vUnit:s1.valor*(s1.pares||1),valor:total*(s1.valor||0)*(s1.pares||1),status:etapa.status});
+      const codVincAP = (etapa.id==='rev'||etapa.id==='conf') && opSec ? opSec.cod : null;
+      if(s1) linhas.push({cod:op.cod,codVinc:codVincAP,produto:op.produto,etapa:ETAPA_LABELS[etapa.id]||etapa.id,desc:'',data:etapa.data_retorno_real,qtd:total,pares:s1.pares||1,vUnit:s1.valor*(s1.pares||1),valor:total*(s1.valor||0)*(s1.pares||1),status:etapa.status});
     });
   });
 
@@ -1220,7 +1225,10 @@ function renderFechBody(mes){
         </tr></thead>
         <tbody>
           ${linhasAP.map(l=>`<tr>
-            <td style="font-weight:600;white-space:nowrap"><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a></td>
+            <td style="font-weight:600;white-space:nowrap">
+              <a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a>
+              ${l.codVinc?`<div style="font-size:10px;color:var(--ch2);opacity:.7;font-weight:400;margin-top:1px">+ ${l.codVinc} (vinculada)</div>`:''}
+            </td>
             <td>${l.produto}</td>
             <td>${l.etapa}</td>
             <td style="white-space:nowrap;font-size:11px">${l.status==='em_producao'?'🔧 Em produção':'⏳ Aguardando'}</td>
@@ -1261,7 +1269,10 @@ function renderFechBody(mes){
         </tr></thead>
         <tbody>
           ${linhas.map((l,li)=>`<tr${l.multiplo?' style="background:#FFFBEB"':''}>
-            <td style="font-weight:600;white-space:nowrap"><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a></td>
+            <td style="font-weight:600;white-space:nowrap">
+              <a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a>
+              ${l.codVinc?`<div style="font-size:10px;color:var(--ch2);opacity:.7;font-weight:400;margin-top:1px">+ ${l.codVinc} (vinculada)</div>`:''}
+            </td>
             <td>${l.produto}</td>
             <td>${l.etapa}${l.desc?'<br/><small style="color:var(--fe);font-size:10px">'+l.desc+'</small>':''}</td>
             <td style="white-space:nowrap">${fmtData(l.data)}</td>
@@ -1604,7 +1615,10 @@ function imprimirFechamento(){
         </tr></thead>
         <tbody>
           ${linhas.map(l=>`<tr>
-            <td style="white-space:nowrap;font-weight:600"><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a></td>
+            <td style="white-space:nowrap;font-weight:600">
+              <a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod)}&from=terceirizados&tercIdx=${tercAtivo}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2)">${l.cod}</a>
+              ${l.codVinc?`<div style="font-size:10px;color:var(--ch2);opacity:.7;font-weight:400;margin-top:1px">+ ${l.codVinc} (vinculada)</div>`:''}
+            </td>
             <td>${l.produto}</td><td>${l.etapa}</td>
             <td style="white-space:nowrap">${fmtData(l.data)}</td>
             <td class="c">${l.qtd}</td>

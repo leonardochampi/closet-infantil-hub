@@ -347,7 +347,8 @@ function calcularTotalTerceirizado(tercIdx, mesAno){
   // Etapas de produção
   ordens.forEach(op=>{
     const opSecundaria = ordens.find(x=>x.op_vinculada===op.cod&&x.id!==op.id);
-    const codDisplay = opSecundaria?op.cod+' + '+opSecundaria.cod:(op.cod||'—');
+    const codDisplay = op.cod||'—';
+    const codVinculado = opSecundaria ? opSecundaria.cod : null;
     op.etapas?.forEach(etapa=>{
       if(etapa.ativa===false||etapa.status!=='concluido'||etapa.id==='conf') return;
       const servicos=getServicosEtapa(t,etapa.id);
@@ -372,7 +373,7 @@ function calcularTotalTerceirizado(tercIdx, mesAno){
       const sMatch=servicos.find(s=>servicoNome&&(s.desc||'').toLowerCase()===servicoNome.toLowerCase());
       const s1=sMatch||findServPorTipo(t.servicos,op.tipo_peca||'conjunto',etapa.id)||(servicos.length===1?servicos[0]:null);
       if(s1){
-        linhas.push({etapa:ETAPA_LABELS[etapa.id]||etapa.id,cod:(etapa.id==='rev'?codDisplay:op.cod),produto:op.produto,qtd:total,vUnit:s1.valor*(s1.pares||1),valor:total*s1.valor*(s1.pares||1)});
+        linhas.push({etapa:ETAPA_LABELS[etapa.id]||etapa.id,cod:codDisplay,codVinc:(etapa.id==='rev'?codVinculado:null),produto:op.produto,qtd:total,vUnit:s1.valor*(s1.pares||1),valor:total*s1.valor*(s1.pares||1)});
         // Sobras de costura para conjunto com serviços específicos por desc
         if(etapa.tipo==='costura'&&(op.tipo_peca||'conjunto')==='conjunto'){
           const findS = (d)=>servicos.find(s=>(s.desc||'').toLowerCase()===d.toLowerCase())||s1;
@@ -732,7 +733,7 @@ function imprimirGeral(){
         <div style="font-size:8pt;font-weight:700;color:#B5916B;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #D4B898;padding-bottom:3px;margin-bottom:6px">${d.t.nome}</div>
         ${d.linhas.length?`<table class="pr-table" style="margin-bottom:6px">
           <thead><tr><th>Ordem</th><th>Produto</th><th>Etapa</th><th class="r">Qtd</th><th class="r">R$/pç</th><th class="r">Total</th></tr></thead>
-          <tbody>${d.linhas.map(l=>`<tr><td><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod||'')}&from=terceirizados&tercIdx=${d.i}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2);font-weight:600">${l.cod||'—'}</a></td><td>${l.produto||'—'}</td><td>${l.etapa}</td><td class="r">${l.qtd}</td><td class="r">R$ ${fmt2(l.vUnit)}</td><td class="r">R$ ${fmt2(l.valor)}</td></tr>`).join('')}</tbody>
+          <tbody>${d.linhas.map(l=>`<tr><td><a href="ClosetInfantil_OrdemProducao.html?cod=${encodeURIComponent(l.cod||'')}&from=terceirizados&tercIdx=${d.i}" style="color:var(--ch);text-decoration:none;border-bottom:1px dashed var(--fe2);font-weight:600">${l.cod||'—'}</a>${l.codVinc?`<div style="font-size:10px;color:var(--ch2);opacity:.7;font-weight:400;margin-top:1px">+ ${l.codVinc} (vinculada)</div>`:''}</td><td>${l.produto||'—'}</td><td>${l.etapa}</td><td class="r">${l.qtd}</td><td class="r">R$ ${fmt2(l.vUnit)}</td><td class="r">R$ ${fmt2(l.valor)}</td></tr>`).join('')}</tbody>
         </table>`:''}
         ${d.lancamentos.length?`<table class="pr-table">
           <thead><tr><th>Lançamento manual</th><th>Data</th><th class="r">Qtd</th><th class="r">R$/un</th><th class="r">Total</th></tr></thead>

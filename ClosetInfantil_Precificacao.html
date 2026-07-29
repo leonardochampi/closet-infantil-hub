@@ -66,13 +66,13 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .base-list{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;padding-right:2px}
 .base-list::-webkit-scrollbar{width:4px}
 .base-list::-webkit-scrollbar-thumb{background:var(--fe2);border-radius:4px}
-.base-item{display:flex;align-items:center;gap:0;border:1.5px solid var(--fe2);border-radius:var(--r-sm);background:var(--pa);overflow:hidden;transition:border-color .15s;cursor:pointer}
+.base-item{display:flex;align-items:stretch;gap:0;border:1.5px solid var(--fe2);border-radius:var(--r-sm);background:var(--pa);transition:border-color .15s;cursor:pointer}
 .base-item:hover{border-color:var(--fe)}
 .base-item.on{border-color:var(--ch);background:var(--pa2)}
-.base-item-info{flex:1;padding:8px 10px;min-width:0}
-.base-item-name{font-size:12px;font-weight:600;color:var(--ch);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.base-item-detail{font-size:10px;color:var(--ch2);margin-top:1px}
-.base-item-del{padding:0 10px;align-self:stretch;display:flex;align-items:center;border-left:1px solid var(--fe2);background:transparent;border:none;cursor:pointer;color:var(--fe2);font-size:14px;transition:color .15s;border-left:1px solid var(--fe2)}
+.base-item-info{flex:1;min-width:0;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.base-item-name{font-size:13px;font-weight:700;color:var(--ch);line-height:1.3;word-break:break-word}
+.base-item-detail{font-size:11px;color:var(--ch2);line-height:1.4}
+.base-item-del{padding:0 10px;align-self:stretch;display:flex;align-items:center;border-left:1px solid var(--fe2);background:transparent;border:none;cursor:pointer;color:var(--fe2);font-size:14px;transition:color .15s;flex-shrink:0}
 .base-item-del:hover{color:var(--rd);background:#fce8e6}
 
 .base-empty{font-size:12px;color:var(--fe2);font-style:italic;padding:10px 0;text-align:center}
@@ -299,7 +299,7 @@ footer{text-align:center;margin-top:36px;font-size:11px;color:var(--fe);font-fam
 
       <div class="base-section">
         <div class="base-header">
-          <span class="base-label">Análises salvas</span>
+          <span class="base-label">Análises salvas <span id="base-canal-atual" style="font-weight:400;opacity:.6;font-size:11px"></span></span>
           <button class="base-add-btn" onclick="salvarNaBase()">+ Salvar produto</button>
         </div>
         <div class="base-list" id="base-list"></div>
@@ -538,22 +538,35 @@ function baseFeedback(msg, type='ok'){
 }
 
 function renderBase(){
-  const base = loadBase();
+  const baseCompleta = loadBase();
   const el = document.getElementById('base-list');
-  if(!base.length){
+
+  // Filtrar apenas produtos salvos para o canal atualmente selecionado
+  const base = baseCompleta
+    .map((p, idxReal) => ({ ...p, idxReal }))
+    .filter(p => p.ch === ch);
+
+  const chNomes = {ml:'Mercado Livre', shein:'Shein', shopee:'Shopee'};
+  const canalEl = document.getElementById('base-canal-atual');
+  if(canalEl) canalEl.textContent = '· ' + (chNomes[ch]||ch);
+
+  if(!baseCompleta.length){
     el.innerHTML = '<div class="base-empty">Nenhuma análise salva ainda.<br>Preencha os campos e clique em "+ Salvar produto".</div>';
     return;
   }
-  const chNomes = {ml:'Mercado Livre', shein:'Shein', shopee:'Shopee'};
-  el.innerHTML = base.map((p,i) => {
-    const chNome  = chNomes[p.ch] || '';
+  if(!base.length){
+    const chNomes = {ml:'Mercado Livre', shein:'Shein', shopee:'Shopee'};
+    el.innerHTML = `<div class="base-empty">Nenhum produto salvo para ${chNomes[ch]||ch} ainda.<br>Preencha os campos e clique em "+ Salvar produto".</div>`;
+    return;
+  }
+  el.innerHTML = base.map((p) => {
+    const i = p.idxReal; // índice real na base completa, usado para editar/remover
     const kitTxt  = p.qtdKit ? (p.qtdKit===1?'Individual':`Kit ${p.qtdKit}`) : '';
-    const precoTxt = p.preco ? `· Preço R$ ${parseFloat(p.preco).toFixed(2)}` : '';
     return `
     <div class="base-item" id="bitem-${i}" onclick="selecionarDaBase(${i})">
       <div class="base-item-info">
         <div class="base-item-name">${p.nome}</div>
-        <div class="base-item-detail">Custo R$ ${parseFloat(p.custo).toFixed(2)} · Frete R$ ${parseFloat(p.frete).toFixed(2)}${chNome?` · ${chNome}`:''}${kitTxt?` · ${kitTxt}`:''}${precoTxt}</div>
+        <div class="base-item-detail">R$ ${parseFloat(p.custo).toFixed(2)}${kitTxt?` · ${kitTxt}`:''}</div>
       </div>
       <button class="base-item-del" onclick="event.stopPropagation();removerDaBase(${i})" title="Remover">×</button>
     </div>`;

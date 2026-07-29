@@ -1614,7 +1614,7 @@ function prepararImpressao(){
     }
   } else if(tipo==='revisao'){
       if(conj){
-        head=`<th class="th-tam">Tam.</th><th class="th-emb" colspan="3">Body</th><th class="th-emb" colspan="3">Calça</th>`;
+        head=`<th class="th-tam">Tam.</th><th class="th-emb" colspan="4">Body</th><th class="th-emb" colspan="4">Calça</th>`;
         const head2=`<th class="th-tam"></th><th class="th-emb">✓ Embal.</th><th class="th-fuchi">Fuchi</th><th class="th-2q">2ª Qual.</th><th class="th-sobra">Sobra</th><th class="th-emb">✓ Embal.</th><th class="th-fuchi">Fuchi</th><th class="th-2q">2ª Qual.</th><th class="th-sobra">Sobra</th>`;
         rows=`<tr>${head2}</tr>`+tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${ck[`emb_${t}`]||''}</td><td>${ck[`fuchi_${t}`]||''}</td><td>${ck[`dq_${t}`]||''}</td><td>${ck[`sob_${t}`]||''}</td><td>${ck[`embb_${t}`]||''}</td><td>${ck[`fuchib_${t}`]||''}</td><td>${ck[`dqb_${t}`]||''}</td><td>${ck[`sobb_${t}`]||''}</td></tr>`).join('');
         const te=tams.reduce((s,t)=>s+(ck[`emb_${t}`]||0),0),tf=tams.reduce((s,t)=>s+(ck[`fuchi_${t}`]||0),0),td=tams.reduce((s,t)=>s+(ck[`dq_${t}`]||0),0),ts=tams.reduce((s,t)=>s+(ck[`sob_${t}`]||0),0);

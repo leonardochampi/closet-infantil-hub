@@ -128,18 +128,18 @@ table.res-grade tr.tot td{background:var(--pa2);font-weight:700}
 .hist-card{background:var(--wh);border-radius:var(--r);padding:22px 24px;box-shadow:var(--shadow)}
 .hist-t{font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--ch);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
 .hist-s{font-size:12px;color:var(--ch2);margin-bottom:14px}
-.hist-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;padding-right:2px}
+.hist-list{display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding-right:4px}
 .hist-list::-webkit-scrollbar{width:4px}
 .hist-list::-webkit-scrollbar-thumb{background:var(--fe2);border-radius:4px}
-.hist-item{display:flex;align-items:center;gap:0;border:1.5px solid var(--fe2);border-radius:var(--r-sm);background:var(--pa);overflow:hidden;cursor:pointer;transition:border-color .15s}
+.hist-item{display:flex;align-items:stretch;gap:0;border:1.5px solid var(--fe2);border-radius:var(--r-sm);background:var(--pa);cursor:pointer;transition:border-color .15s;min-height:64px}
 .hist-item:hover{border-color:var(--fe)}
-.hist-item-body{flex:1;padding:10px 14px;min-width:0}
-.hist-item-top{display:flex;align-items:baseline;gap:8px}
-.hist-item-nome{font-size:13px;font-weight:600;color:var(--ch)}
-.hist-item-data{font-size:11px;color:var(--fe)}
-.hist-item-detail{font-size:11px;color:var(--ch2);margin-top:3px}
-.hist-item-custo{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ch);padding:10px 14px;border-left:1px solid var(--fe2);white-space:nowrap}
-.hist-item-del{padding:0 12px;align-self:stretch;display:flex;align-items:center;border:none;border-left:1px solid var(--fe2);background:transparent;cursor:pointer;color:var(--fe2);font-size:16px;transition:all .15s}
+.hist-item-body{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.hist-item-nome{font-size:13px;font-weight:700;color:var(--ch);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.hist-item-data{font-size:10px;color:var(--fe);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
+.hist-item-detail{font-size:11px;color:var(--ch2);line-height:1.5}
+.hist-item-right{display:flex;align-items:center;flex-shrink:0}
+.hist-item-custo{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--ch);padding:0 16px;border-left:1px solid var(--fe2);white-space:nowrap;display:flex;align-items:center;min-width:100px;justify-content:flex-end}
+.hist-item-del{padding:0 12px;align-self:stretch;display:flex;align-items:center;border:none;border-left:1px solid var(--fe2);background:transparent;cursor:pointer;color:var(--fe2);font-size:16px;transition:all .15s;flex-shrink:0;border-top-right-radius:var(--r-sm);border-bottom-right-radius:var(--r-sm)}
 .hist-item-del:hover{color:var(--rd);background:#fce8e6}
 .hist-empty{font-size:12px;color:var(--fe2);font-style:italic;padding:12px 0;text-align:center}
 
@@ -836,8 +836,24 @@ function recalc(){
   const insumos = v('insumos');
   const processo = talh + nuca + frente + elastico + etiquetaInf + costura + botao + emb + insumos;
 
-  // custo médio total
-  const custoMedio = malhaUnit + processo;
+  // custo médio total (base, usando consumo digitado — referência antes da grade)
+  const custoMedioBase = malhaUnit + processo;
+
+  // ── grade breakdown ────────────────────────────────────────────────────────
+  const grades = TAMANHOS.map(t => ({t, qtd: gradeQtd[t]||0, fator: getFator(t)}));
+  const totalPonderado = grades.reduce((s,g) => s + g.qtd * g.fator, 0);
+  const totQtdGrade = grades.reduce((s,g) => s + g.qtd, 0);
+
+  // custo médio real = média ponderada pela grade (se houver quantidades informadas), senão cai no custo base
+  let custoMedio = custoMedioBase;
+  if(totQtdGrade > 0){
+    const somaCustoTotal = grades.reduce((s,g) => {
+      if(g.qtd === 0) return s;
+      const malhaGrade = malhaUnit > 0 ? malhaUnit * g.fator / getFator(TAMANHOS[0]||'P') : 0;
+      return s + (malhaGrade + processo) * g.qtd;
+    }, 0);
+    custoMedio = somaCustoTotal / totQtdGrade;
+  }
 
   // ── result hero ────────────────────────────────────────────────────────────
   const nomeAtivo = document.getElementById('lote-nome').value.trim() || 'Lote atual';
@@ -876,10 +892,6 @@ function recalc(){
       <span class="bk-label">Custo médio por conjunto</span>
       <span class="bk-val">R$ ${fmt(custoMedio)}</span>
     </div>`;
-
-  // ── grade breakdown ────────────────────────────────────────────────────────
-  const grades = TAMANHOS.map(t => ({t, qtd: gradeQtd[t]||0, fator: getFator(t)}));
-  const totalPonderado = grades.reduce((s,g) => s + g.qtd * g.fator, 0);
 
   const resBody = document.getElementById('res-grade-tbody');
   let totQtd = 0, totCusto = 0;
@@ -973,14 +985,14 @@ function renderHist(){
     const i = hist.length-1-ri;
     return `<div class="hist-item" onclick="carregarLote(${i})">
       <div class="hist-item-body">
-        <div class="hist-item-top">
-          <span class="hist-item-nome">${l.nome}</span>
-          <span class="hist-item-data">${l.data}</span>
-        </div>
+        <div class="hist-item-nome">${l.nome || '<em style="opacity:.6;font-weight:400">Sem nome</em>'}</div>
+        <div class="hist-item-data">${l.data}</div>
         <div class="hist-item-detail">${l.qtd} conjuntos · Malha R$ ${fmt(l.malhaUnit)} · Processo R$ ${fmt(l.processo)}</div>
       </div>
-      <div class="hist-item-custo">R$ ${fmt(l.custoMedio)}</div>
-      <button class="hist-item-del" onclick="event.stopPropagation();removerLote(${i})" title="Remover">×</button>
+      <div class="hist-item-right">
+        <div class="hist-item-custo">R$ ${fmt(l.custoMedio)}</div>
+        <button class="hist-item-del" onclick="event.stopPropagation();removerLote(${i})" title="Remover">×</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1003,10 +1015,24 @@ function salvarLote(){
     + (temInferior ? v('elastico')+v('etiqueta-inf') : 0)
     + v('costura')+v('botao')+v('embalagem')+v('insumos');
   if(!nf && !processo){ feedback('Preencha ao menos um valor antes de salvar.','err'); return; }
+
+  // Calcular custo médio ponderado pela grade (mesma lógica do painel)
+  const gradesLote = TAMANHOS.map(t => ({t, qtd: gradeQtd[t]||0, fator: getFator(t)}));
+  const totQtdLote = gradesLote.reduce((s,g)=>s+g.qtd,0);
+  let custoMedioLote = malhaUnit + processo;
+  if(totQtdLote > 0){
+    const somaLote = gradesLote.reduce((s,g)=>{
+      if(g.qtd===0) return s;
+      const malhaGrade = malhaUnit>0 ? malhaUnit*g.fator/getFator(TAMANHOS[0]||'P') : 0;
+      return s + (malhaGrade+processo)*g.qtd;
+    },0);
+    custoMedioLote = somaLote/totQtdLote;
+  }
+
   const hist = loadHist();
   hist.push({
     nome, data: new Date().toLocaleDateString('pt-BR'),
-    qtd, malhaUnit, processo, custoMedio: malhaUnit+processo,
+    qtd, malhaUnit, processo, custoMedio: custoMedioLote,
     nf, malhaKg: v('malha-peso'), tamanhos:[...TAMANHOS], gradeQtd:{...gradeQtd},
     encConsumoCm: consumoCm, encRendimento: rendimento, encFriso: friso,
     talh:getTalh(), talhUnit: talhCusto, talhMult: talhMult, talhTipo: talhTipo,

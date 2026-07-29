@@ -376,12 +376,13 @@ footer{text-align:center;margin-top:36px;font-size:11px;color:var(--fe);font-fam
         <button class="opt-btn on" data-val="2" data-tipo="conjunto" onclick="setOpt('talhtipo',this)">Conjunto — 2x</button>
         <button class="opt-btn" data-val="1" data-tipo="superior" onclick="setOpt('talhtipo',this)">Superior — 1x</button>
         <button class="opt-btn" data-val="1" data-tipo="inferior" onclick="setOpt('talhtipo',this)">Inferior — 1x</button>
+        <button class="opt-btn" data-val="1" data-tipo="romper" onclick="setOpt('talhtipo',this)">Romper — 1x</button>
       </div>
 
       <div style="font-size:11px;color:var(--ch2);font-weight:500;margin-bottom:8px">Empresa de talhação</div>
       <div class="opt-row" id="talh-opts">
-        <button class="opt-btn on" data-val="0.18" onclick="setOpt('talh',this)">Empresa A — R$ 0,18/peça</button>
-        <button class="opt-btn" data-val="0.25" onclick="setOpt('talh',this)">Empresa B — R$ 0,25/peça</button>
+        <button class="opt-btn on" data-val="0.18" onclick="setOpt('talh',this)">Gilberto — R$ 0,18/peça</button>
+        <button class="opt-btn" data-val="0.25" onclick="setOpt('talh',this)">TalheAqui — R$ 0,25/peça</button>
         <button class="opt-btn" data-val="custom" onclick="setOpt('talh',this)">Outro valor</button>
       </div>
       <div class="field" id="talh-custom-wrap" style="display:none;margin-top:10px">
@@ -823,7 +824,7 @@ function recalc(){
 
   // etapas de processo (iguais para todos os tamanhos)
   const talh    = getTalh();
-  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior';
+  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior' || talhTipo === 'romper';
   const temInferior  = talhTipo === 'conjunto' || talhTipo === 'inferior';
   const nuca    = temSuperior ? v('est-nuca') : 0;
   const frente  = (temSuperior && frenteAtiva) ? v('est-frente') : 0;
@@ -951,6 +952,37 @@ function setOpt(group, btn){
     talhMult = parseInt(btn.dataset.val)||1;
     talhTipo = btn.dataset.tipo||'conjunto';
     atualizarVisibilidadePecas();
+
+    if(talhTipo === 'romper'){
+      // Romper: força TalheAqui a R$0,60/peça (valor exclusivo do romper) e trava a escolha
+      talhCusto = '0.60';
+      document.querySelectorAll('#talh-opts .opt-btn').forEach(b=>b.classList.remove('on'));
+      document.getElementById('talh-custom-wrap').style.display = 'none';
+      document.querySelectorAll('#talh-opts .opt-btn').forEach(b=>b.disabled = true);
+      let btnRomper = document.getElementById('talh-btn-romper');
+      if(!btnRomper){
+        btnRomper = document.createElement('button');
+        btnRomper.id = 'talh-btn-romper';
+        btnRomper.className = 'opt-btn on';
+        btnRomper.textContent = 'TalheAqui (Romper) — R$ 0,60/peça';
+        btnRomper.disabled = true;
+        document.getElementById('talh-opts').appendChild(btnRomper);
+      }
+      btnRomper.classList.add('on');
+      btnRomper.style.display = '';
+    } else {
+      // Sair do modo romper: reabilitar escolha normal de empresa
+      document.querySelectorAll('#talh-opts .opt-btn').forEach(b=>b.disabled = false);
+      const btnRomper = document.getElementById('talh-btn-romper');
+      if(btnRomper) btnRomper.style.display = 'none';
+      // Restaurar seleção padrão (Gilberto) se estava em romper
+      if(talhCusto === '0.60'){
+        talhCusto = '0.18';
+        document.querySelectorAll('#talh-opts .opt-btn').forEach(b=>b.classList.remove('on'));
+        const primeiroBtn = document.querySelector('#talh-opts .opt-btn');
+        if(primeiroBtn) primeiroBtn.classList.add('on');
+      }
+    }
   }
   recalc();
 }
@@ -963,7 +995,7 @@ function toggleFrenteEst(){
 }
 
 function atualizarVisibilidadePecas(){
-  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior';
+  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior' || talhTipo === 'romper';
   const temInferior  = talhTipo === 'conjunto' || talhTipo === 'inferior';
   document.getElementById('card-estamparia').style.display = temSuperior ? '' : 'none';
   document.getElementById('card-elastico').style.display    = temInferior ? '' : 'none';
@@ -1006,7 +1038,7 @@ function salvarLote(){
   const preco      = parseFloat(document.getElementById('enc-preco').value)||0;
   const consumoKg  = (consumoCm>0 && rendimento>0) ? (consumoCm/100)/rendimento : 0;
   const malhaUnit  = consumoKg>0 && preco>0 ? consumoKg*(1+friso/100)*preco : 0;
-  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior';
+  const temSuperior = talhTipo === 'conjunto' || talhTipo === 'superior' || talhTipo === 'romper';
   const temInferior  = talhTipo === 'conjunto' || talhTipo === 'inferior';
   const processo = getTalh()
     + (temSuperior ? v('est-nuca')+(frenteAtiva?v('est-frente'):0) : 0)

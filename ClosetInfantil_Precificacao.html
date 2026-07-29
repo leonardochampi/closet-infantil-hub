@@ -709,7 +709,7 @@ function calcRow(preco, custo, frete, emb, qtd){
     com  = preco * (tipo === 'classico' ? 0.14 : 0.19);
     taxa = mlTaxaFixa(preco);
   } else if(ch === 'shein'){
-    com = preco * 0.16;
+    com = preco * 0.18;
   } else {
     const sp = shopeeComissao(preco);
     com  = preco * sp.pct;
@@ -758,7 +758,7 @@ function precoParaMargem(custo, frete, emb, margemDesejada, qtd){
       com  = p * (tipo==='classico' ? 0.14 : 0.19);
       taxa = mlTaxaFixa(p);
     } else if(ch==='shein'){
-      com = p * 0.16;
+      com = p * 0.18;
     } else {
       const sp = shopeeComissao(p);
       com  = p * sp.pct;
@@ -890,7 +890,7 @@ function setCh(c, btn){
   const titles = {ml:'Mercado Livre',shein:'Shein',shopee:'Shopee'};
   const subs   = {
     ml:'Comissão 14% Clássico / 19% Premium · Taxa fixa por faixa de preço',
-    shein:'Comissão 16% · Frete fixo por produto',
+    shein:'Comissão 18% · Frete fixo por produto',
     shopee:'Faixas mar/2026 · ≤R$79,99: 20%+R$4 · R$80–99: 14%+R$16 · R$100–199: 14%+R$20 · R$200–499: 14%+R$26 · dev R$0,49 fixo'
   };
   document.getElementById('ch-title').textContent = titles[c];
@@ -898,7 +898,7 @@ function setCh(c, btn){
   document.getElementById('note-bar').textContent = c==='ml'
     ? 'Taxa fixa ML: até R$28,99→R$6,25 · R$29–R$50→R$6,50 · R$50–R$79→R$6,75 · acima de R$79 apenas taxa percentual'
     : c==='shein'
-    ? 'A Shein cobra comissão de 16% sobre o preço de venda + frete fixo por produto. Sem taxa de antecipação.'
+    ? 'A Shein cobra comissão de 18% sobre o preço de venda + frete fixo por produto. Sem taxa de antecipação.'
     : 'Shopee (atualizado mar/2026, cenário pessimista sem PIX): ≤R$79,99→20%+R$4 · R$80–99,99→14%+R$16 · R$100–199,99→14%+R$20 · R$200–499,99→14%+R$26. Inclui devolução fácil R$ 0,49 fixo e antecipação 2,5%.';
   // frete default by channel
   // ML e Shein têm frete cobrado do vendedor; Shopee não (taxa fixa já inclusa na comissão)

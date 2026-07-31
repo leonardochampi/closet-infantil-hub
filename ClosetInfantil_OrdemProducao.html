@@ -1192,8 +1192,10 @@ function confirmarConsolidacao(){
 
   // Desativar Revisão/Embalagem e Conferência nas OPs originais
   // (evita contar duas vezes: a OP consolidada é quem representa o par na Revisão)
-  ops.forEach(op => {
-    op.etapas?.forEach(etapa => {
+  // Buscar diretamente no array `ordens` pelo id (mais seguro que confiar em índices antigos)
+  ops.forEach(opRef => {
+    const opReal = ordens.find(o => o.id === opRef.id) || opRef;
+    opReal.etapas?.forEach(etapa => {
       if(etapa.id === 'rev' || etapa.id === 'conf'){
         etapa._ativa_antes_consolidar = etapa.ativa; // guarda estado original, caso precise reverter
         etapa.ativa = false;
@@ -1223,6 +1225,7 @@ function confirmarConsolidacao(){
   abrirDetalhe();
 
   const avisos = [];
+  avisos.push(`🔒 Revisão/Embalagem desativada em: ${ops.map(o=>o.cod).join(', ')}.`);
   if(revHerdada) avisos.push(`📋 Dados da Revisão/Embalagem herdados${revHerdada.fornecedor?' de '+revHerdada.fornecedor:''}.`);
   if(opsTransferidas.length) avisos.push(`🔗 Vínculo transferido: ${opsTransferidas.join(', ')} agora aponta para ${cod}.`);
   if(avisos.length){

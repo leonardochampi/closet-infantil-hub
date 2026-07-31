@@ -377,13 +377,14 @@ function calcularAProduzir(tercIdx, mesAno){
 function popularMeses(){
   const sel = document.getElementById('sel-mes');
   const agora = new Date();
-  for(let i=0;i<12;i++){
+  for(let i=-1;i<12;i++){
     const d = new Date(agora.getFullYear(), agora.getMonth()-i, 1);
     const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     const opt = document.createElement('option');
     opt.value = val; opt.textContent = mesPorExtenso(val);
     sel.appendChild(opt);
   }
+  sel.value = agora.getFullYear()+'-'+String(agora.getMonth()+1).padStart(2,'0');
 }
 
 function getHorasLancadas(tercId, mes){
@@ -481,8 +482,8 @@ function renderDashboard(){
   const renderCard = d => {
     const st = d.st;
     const isPago = st.status==='pago';
-  const tPagoParc = totalPagoParc(d.t.id, mesAtual());
-  const tAdiant2  = totalAdiantamentos(d.t.id, mesAtual());
+  const tPagoParc = totalPagoParc(d.t.id, mes);
+  const tAdiant2  = totalAdiantamentos(d.t.id, mes);
   const totalDevido2 = Math.max(0, d.totalGeral - tAdiant2);
   const temParcial = tPagoParc > 0 && tPagoParc < totalDevido2;
   const quitado = tPagoParc >= totalDevido2 && totalDevido2 > 0;
@@ -510,7 +511,7 @@ function renderDashboard(){
         </div>
       </div>
       ${(()=>{
-        const tAdiant = totalAdiantamentos(d.t.id, mesAtual());
+        const tAdiant = totalAdiantamentos(d.t.id, mes);
         if(!tAdiant) return '';
         const saldo = d.totalGeral - tAdiant;
         return `<div style="padding:10px 16px;background:#FEE2E2;border-bottom:1px solid #F5B8B8">

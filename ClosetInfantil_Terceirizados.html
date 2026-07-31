@@ -1047,14 +1047,14 @@ function removerHora(tercId, mes, id){
 
 function renderFechamento(){
   const t = terceirizados[tercAtivo];
-  // Gerar lista de meses (3 meses à frente até 12 meses atrás)
+  // Gerar lista de meses (1 mês à frente até 12 meses atrás)
   const meses = [];
   const agora = new Date();
-  for(let i=0;i<12;i++){
+  for(let i=-1;i<12;i++){
     const d = new Date(agora.getFullYear(), agora.getMonth()-i, 1);
     meses.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
   }
-  const mes = meses[0]; // atual
+  const mes = meses[1]; // atual (índice 1, pois índice 0 agora é o mês seguinte)
   const linhas = ordenarLinhas(calcularFechamento(tercAtivo, mes));
   const total = linhas.reduce((s,l)=>s+l.valor, 0);
   const st = getFechStatus(t.id, mes);
@@ -1065,7 +1065,7 @@ function renderFechamento(){
       <span>Fechamento</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <select id="sel-mes" onchange="atualizarFechamento(this.value)" style="padding:6px 10px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:var(--ch)">
-          ${meses.map(m=>`<option value="${m}">${mesPorExtenso(m)}</option>`).join('')}
+          ${meses.map(m=>`<option value="${m}"${m===mes?' selected':''}>${mesPorExtenso(m)}</option>`).join('')}
         </select>
         <button class="btn btn-print btn-sm" onclick="imprimirFechamento()">🖨 Imprimir</button>
       </div>
@@ -1356,11 +1356,11 @@ function renderPorOrdem(){
   const ordens = loadOrdens();
   const agora = new Date();
   const meses = [];
-  for(let i=0;i<12;i++){
+  for(let i=-1;i<12;i++){
     const d = new Date(agora.getFullYear(), agora.getMonth()-i, 1);
     meses.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
   }
-  const mesSel = document.getElementById('po-mes-sel')?.value || meses[0];
+  const mesSel = document.getElementById('po-mes-sel')?.value || meses[1];
 
   // Helper: mês da etapa/talhação
   function getMesOp(obj, op){

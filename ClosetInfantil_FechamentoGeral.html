@@ -483,8 +483,17 @@ function renderDashboard(){
   const totalAProd   = dados.reduce((s,d)=>s+d.ap.total,0);
   const totalPago    = dados.filter(d=>d.st.status==='pago').reduce((s,d)=>s+d.totalGeral,0);
   const totalPendente= totalGeral - totalPago;
-  const nPago = dados.filter(d=>d.st.status==='pago'&&d.totalGeral>0).length;
-  const nAP   = dados.filter(d=>d.st.status!=='pago'&&d.totalGeral>0).length;
+
+  // Considerar quitado tanto pelo status manual quanto por pagamentos parciais que já cobrem o total devido
+  const estaQuitado = d => {
+    if(d.st.status==='pago') return true;
+    const tAdiant = totalAdiantamentos(d.t.id, mes);
+    const tPago   = totalPagoParc(d.t.id, mes);
+    const devido  = Math.max(0, d.totalGeral - tAdiant);
+    return devido > 0 && tPago >= devido;
+  };
+  const nPago = dados.filter(d=>estaQuitado(d)&&d.totalGeral>0).length;
+  const nAP   = dados.filter(d=>!estaQuitado(d)&&d.totalGeral>0).length;
 
   // Total de adiantamentos e pagamentos parciais (terceirizados + assistentes)
   const totalAdiantTodos = dados.reduce((s,d)=>s+totalAdiantamentos(d.t.id,mes),0)

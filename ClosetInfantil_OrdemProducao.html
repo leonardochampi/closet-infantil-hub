@@ -1357,11 +1357,11 @@ function renderForm(){
         <div class="field"><label>Data de criação</label><input type="date" value="${o.data_criacao||''}" oninput="salvarCampo('data_criacao',this.value)"/></div>
         <div class="field"><label>Prazo de entrega</label><input type="date" value="${o.prazo||''}" oninput="salvarCampo('prazo',this.value)"/></div>
         <div class="field cols-span-2" style="grid-column:1/-1">
-          <label>Link da NF (Dropbox)</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="url" value="${o.link_nf||''}" placeholder="Cole o link do Dropbox aqui..." oninput="salvarCampo('link_nf',this.value)" style="flex:1"/>
-            ${o.link_nf ? `<a href="${o.link_nf}" target="_blank" style="white-space:nowrap;padding:8px 14px;background:var(--bl2);color:var(--bl);border:1.5px solid var(--bl);border-radius:var(--r-sm);font-size:12px;font-weight:600;text-decoration:none;font-family:'Poppins',sans-serif">📄 Abrir NF</a>` : ''}
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <label style="margin:0">Links NF</label>
+            <button onclick="adicionarNF()" style="font-size:11px;padding:3px 10px;border:1.5px solid var(--fe2);border-radius:10px;background:var(--pa2);color:var(--ch2);cursor:pointer;font-family:'Poppins',sans-serif">+ Adicionar NF</button>
           </div>
+          <div id="nfs-wrap">${renderNFs(o.nfs||[])}</div>
         </div>
         <div class="field">
           <label>OP vinculada <span style="font-size:10px;color:var(--fe);font-weight:400">(body principal)</span></label>
@@ -1697,6 +1697,47 @@ function prepararImpressao(){
 }
 
 // ── RETORNOS PARCIAIS ──────────────────────────────────────────────────────────
+// ── LINKS NF (múltiplos) ─────────────────────────────────────────────────────
+function renderNFs(nfs){
+  if(!nfs.length) return '<div style="font-size:11px;color:var(--fe2);font-style:italic;padding:4px 0">Nenhuma NF anexada.</div>';
+  return nfs.map((nf,ni)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;background:var(--pa2);border-radius:var(--r-sm);padding:8px 10px">
+      <input type="text" value="${nf.desc||''}" placeholder="Ex: Malha BIL, Aviamentos..." oninput="salvarNF(${ni},'desc',this.value)" style="width:180px;padding:6px 8px;font-size:12px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif"/>
+      <input type="url" value="${nf.link||''}" placeholder="Cole o link da NF aqui..." oninput="salvarNF(${ni},'link',this.value)" style="flex:1;padding:6px 8px;font-size:12px;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif"/>
+      ${nf.link ? `<a href="${nf.link}" target="_blank" style="white-space:nowrap;padding:6px 12px;background:var(--bl2);color:var(--bl);border:1.5px solid var(--bl);border-radius:var(--r-sm);font-size:11px;font-weight:600;text-decoration:none;font-family:'Poppins',sans-serif">📄 Abrir</a>` : ''}
+      <button onclick="removerNF(${ni})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" title="Remover">×</button>
+    </div>`).join('');
+}
+
+function adicionarNF(){
+  const o = ordens[ordemAtiva];
+  if(!o.nfs) o.nfs = [];
+  o.nfs.push({desc:'', link:''});
+  saveOrdens(ordens);
+  document.getElementById('nfs-wrap').innerHTML = renderNFs(o.nfs);
+}
+
+function salvarNF(ni, campo, valor){
+  const o = ordens[ordemAtiva];
+  if(!o.nfs || !o.nfs[ni]) return;
+  o.nfs[ni][campo] = valor;
+  saveOrdens(ordens);
+  // Atualizar só esse item sem re-renderizar tudo (mantém foco no input)
+  if(campo === 'link'){
+    const wrap = document.getElementById('nfs-wrap');
+    if(wrap) wrap.innerHTML = renderNFs(o.nfs);
+  }
+}
+
+function removerNF(ni){
+  const o = ordens[ordemAtiva];
+  if(!o.nfs) return;
+  o.nfs.splice(ni,1);
+  saveOrdens(ordens);
+  document.getElementById('nfs-wrap').innerHTML = renderNFs(o.nfs);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderRetornosParciais(ei, retornos){
   const o = ordens[ordemAtiva];
   const tams = o.grade_tamanhos||[];

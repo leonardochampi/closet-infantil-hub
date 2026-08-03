@@ -314,6 +314,7 @@ function loadOrdens(){ try{ return _lsGet(OP_KEY, []) }catch(e){ return [] } }
 let terceirizados = loadTerc();
 let tercAtivo = null; // índice
 let abaAtiva = 'fechamento'; // fechamento | ordens
+let assistMesAberto = null; // mês do acordeão do assistente interno atualmente expandido
 
 const ETAPA_LABELS = {
   talh:'Talhação',
@@ -729,17 +730,17 @@ function renderPagamentos(tercId, mes, totalDevido){
       </tbody>
     </table>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div class="field" style="min-width:130px;margin-bottom:0"><label>Data</label><input type="date" id="pag-data-${tercId}" /></div>
-      <div class="field" style="flex:1;min-width:80px;margin-bottom:0"><label>Valor (R$)</label><input type="number" id="pag-valor-${tercId}" min="0" step="0.01" placeholder="${fmt2(saldo>0?saldo:totalDevido)}"/></div>
-      <div class="field" style="flex:2;min-width:120px;margin-bottom:0"><label>Observação</label><input type="text" id="pag-obs-${tercId}" placeholder="Opcional"/></div>
+      <div class="field" style="min-width:130px;margin-bottom:0"><label>Data</label><input type="date" id="pag-data-${tercId}-${mes}" /></div>
+      <div class="field" style="flex:1;min-width:80px;margin-bottom:0"><label>Valor (R$)</label><input type="number" id="pag-valor-${tercId}-${mes}" min="0" step="0.01" placeholder="${fmt2(saldo>0?saldo:totalDevido)}"/></div>
+      <div class="field" style="flex:2;min-width:120px;margin-bottom:0"><label>Observação</label><input type="text" id="pag-obs-${tercId}-${mes}" placeholder="Opcional"/></div>
       <button class="btn btn-ghost btn-sm" onclick="
-        const d=document.getElementById('pag-data-${tercId}').value;
-        const v=document.getElementById('pag-valor-${tercId}').value;
-        const o=document.getElementById('pag-obs-${tercId}').value;
+        const d=document.getElementById('pag-data-${tercId}-${mes}').value;
+        const v=document.getElementById('pag-valor-${tercId}-${mes}').value;
+        const o=document.getElementById('pag-obs-${tercId}-${mes}').value;
         if(!v){alert('Informe o valor.');return;}
         adicionarPagamento('${tercId}','${mes}',d,v,o);
-        document.getElementById('pag-valor-${tercId}').value='';
-        document.getElementById('pag-obs-${tercId}').value='';
+        document.getElementById('pag-valor-${tercId}-${mes}').value='';
+        document.getElementById('pag-obs-${tercId}-${mes}').value='';
       ">+ Registrar</button>
     </div>
   </div>`;
@@ -884,8 +885,8 @@ function renderFechamentoAssistente(){
     const tPago  = pags.reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
     const saldo  = Math.max(0, totalR - tPago);
     const quitado = tPago >= totalR && totalR > 0;
-    // Abrir por padrão apenas o mês atual
-    const aberto = m.val === mesAtualVal;
+    // Abrir o mês que o usuário deixou expandido, ou o mês atual por padrão
+    const aberto = assistMesAberto ? m.val === assistMesAberto : m.val === mesAtualVal;
     const idAcc  = `acc-${t.id}-${m.val}`;
     const temDados = lancamentos.length > 0 || totalR > 0;
 
@@ -899,7 +900,7 @@ function renderFechamentoAssistente(){
 
     return `
       <div style="margin-bottom:6px;border-radius:var(--r-sm);overflow:hidden;border:1.5px solid ${borderHeader}">
-        <div onclick="toggleAccAssistente('${idAcc}')"
+        <div onclick="toggleAccAssistente('${idAcc}','${m.val}')"
           style="background:${bgHeader};padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
           <div style="display:flex;align-items:center;gap:12px">
             <span id="${idAcc}-chev" style="font-size:14px;transition:transform .2s;display:inline-block;transform:${aberto?'rotate(90deg)':'rotate(0deg)'}">▶</span>
@@ -919,13 +920,14 @@ function renderFechamentoAssistente(){
   }).join('');
 }
 
-function toggleAccAssistente(id){
+function toggleAccAssistente(id, mes){
   const el = document.getElementById(id);
   const chev = document.getElementById(id+'-chev');
   if(!el) return;
   const aberto = el.style.display !== 'none';
   el.style.display = aberto ? 'none' : 'block';
   if(chev) chev.style.transform = aberto ? 'rotate(0deg)' : 'rotate(90deg)';
+  if(mes) assistMesAberto = aberto ? null : mes;
 }
 
 function renderFormHoras(tercId, mes, lancamentos, valorHora){
@@ -1403,7 +1405,13 @@ function renderLancamentos(tercId, mes){
 }
 
 function atualizarFechamento(mes){
-  document.getElementById('fech-body').innerHTML = renderFechBody(mes);
+  const t = terceirizados[tercAtivo];
+  if(t && t.tipo === 'assistente'){
+    renderAba();
+  } else {
+    const el = document.getElementById('fech-body');
+    if(el) el.innerHTML = renderFechBody(mes);
+  }
 }
 
 function marcarPago(tercId, mes){

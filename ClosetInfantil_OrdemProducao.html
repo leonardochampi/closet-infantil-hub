@@ -259,7 +259,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     const _FC = {apiKey:"AIzaSyDtgPZ5sMOEb5ObqhVF-cVyTD6s6ENubKA",authDomain:"closet-infantil-hub.firebaseapp.com",projectId:"closet-infantil-hub",storageBucket:"closet-infantil-hub.firebasestorage.app",messagingSenderId:"580715110559",appId:"1:580715110559:web:f6751ad3ba3376206442aa"};
     const _app = initializeApp(_FC);
     window._auth = getAuth(_app);
@@ -267,6 +267,30 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
     window.fsSet = async (key, value) => { await setDoc(doc(window._db,'hub',key),{data:JSON.stringify(value)}); };
     window.fsGet = async (key) => { const s=await getDoc(doc(window._db,'hub',key)); if(!s.exists()) return null; try{ return JSON.parse(s.data().data); }catch(e){ return null; } };
     window.fsListen = (key, cb) => onSnapshot(doc(window._db,'hub',key), s => { if(!s.exists()){ cb(null); return; } try{ cb(JSON.parse(s.data().data)); }catch(e){ cb(null); } });
+    // Reserva atômica do próximo número de OP direto no Firestore — evita que dois
+    // dispositivos (offline/online) gerem o mesmo código ao criar uma OP quase ao mesmo tempo.
+    // localMaxHint = maior número de OP já visto localmente, usado como piso de segurança
+    // caso o contador salvo no Firestore esteja desatualizado.
+    window.fsNextSeq = async (localMaxHint) => {
+      if(!window._db) return null;
+      try{
+        const ref = doc(window._db,'hub','ci_lote_seq');
+        const n = await runTransaction(window._db, async (tx) => {
+          const snap = await tx.get(ref);
+          let cur = 0;
+          if(snap.exists()){
+            try{ cur = parseInt(JSON.parse(snap.data().data))||0; }catch(e){ cur = 0; }
+          }
+          const next = Math.max(cur, localMaxHint||0) + 1;
+          tx.set(ref, {data: JSON.stringify(next)});
+          return next;
+        });
+        return n;
+      }catch(e){
+        console.error('fsNextSeq falhou, usando fallback local:', e);
+        return null;
+      }
+    };
     window.fsLogout = () => signOut(window._auth).then(()=>window.location.href='login.html');
     onAuthStateChanged(window._auth, user => {
       if(!user){ window.location.href='login.html'; return; }
@@ -372,21 +396,38 @@ const SEQ_KEY = 'ci_lote_seq';
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 function loadOrdens(){ try{ return _lsGet(OP_KEY, []) }catch(e){ return [] } }
 function saveOrdens(o){ try{ _lsSet(OP_KEY, o) }catch(e){} }
-function nextSeq(){
+async function nextSeq(){
   const ano = new Date().getFullYear().toString().slice(2);
-  let n = 1;
-  try{ n = parseInt(_lsGet(SEQ_KEY, null)||'0') + 1; }catch(e){ n = 1; }
 
-  // Garantir que o número não colide com nenhuma OP já existente
-  const codigosExistentes = new Set(ordens.map(o=>o.cod));
-  let cod = 'CI-'+ano+'-'+String(n).padStart(4,'0');
-  while(codigosExistentes.has(cod)){
-    n++;
-    cod = 'CI-'+ano+'-'+String(n).padStart(4,'0');
+  // Maior número de OP já visto localmente — usado como piso de segurança
+  let localMax = 0;
+  ordens.forEach(o=>{
+    const m = /-(\d+)$/.exec(o.cod||'');
+    if(m) localMax = Math.max(localMax, parseInt(m[1])||0);
+  });
+
+  // 1) Tenta reservar o número direto no Firebase (transação atômica).
+  //    Isso impede que dois dispositivos criem OPs com o mesmo código ao mesmo tempo.
+  let n = null;
+  if(window.fsNextSeq){
+    try{ n = await window.fsNextSeq(localMax); }catch(e){ n = null; }
+  }
+
+  // 2) Fallback local (sem Firebase disponível): mantém o comportamento anterior,
+  //    mas usando localMax como piso extra de segurança.
+  if(n === null){
+    try{ n = parseInt(_lsGet(SEQ_KEY, null)||'0') + 1; }catch(e){ n = 1; }
+    n = Math.max(n, localMax + 1);
+    const codigosExistentes = new Set(ordens.map(o=>o.cod));
+    let codTeste = 'CI-'+ano+'-'+String(n).padStart(4,'0');
+    while(codigosExistentes.has(codTeste)){
+      n++;
+      codTeste = 'CI-'+ano+'-'+String(n).padStart(4,'0');
+    }
   }
 
   try{ localStorage.setItem(SEQ_KEY, String(n)); }catch(e){}
-  return cod;
+  return 'CI-'+ano+'-'+String(n).padStart(4,'0');
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -413,8 +454,8 @@ function ehSuperior(o){ return o.tipo_peca==='body'||o.tipo_peca==='romper'||o.t
 function ehInferior(o){ return o.tipo_peca==='calca'||o.tipo_peca==='bermuda'; }
 
 // ── NOVA ORDEM ────────────────────────────────────────────────────────────────
-function novaOrdem(){
-  const cod = nextSeq();
+async function novaOrdem(){
+  const cod = await nextSeq();
   const ordem = {
     id: genId(), cod,
     produto: '',
@@ -1144,7 +1185,7 @@ function fecharModalConsolidar(){
   if(el) el.remove();
 }
 
-function confirmarConsolidacao(){
+async function confirmarConsolidacao(){
   const opsIdx = [..._consolidarSelecionadas];
   const ops = opsIdx.map(i=>ordens[i]);
   const nome = document.getElementById('nome-consolidada').value.trim() || (ops[0].produto+' - CONSOLIDADO');
@@ -1152,9 +1193,8 @@ function confirmarConsolidacao(){
   const gradeSum = {};
   tamanhos.forEach(t => gradeSum[t] = ops.reduce((s,o)=>s+(parseInt(o.grade?.[t])||0),0));
 
-  const cod = nextSeq();
+  const cod = await nextSeq();
   const opBase = ops[0];
-
   // Herdar dados da Revisão/Embalagem já preenchidos em alguma das OPs originais
   let revHerdada = null;
   for(const op of ops){

@@ -404,7 +404,7 @@ function renderServicosTags(){
   if(!t.servicos.length){ el.innerHTML='<span style="font-size:11px;color:var(--fe);font-style:italic">Nenhum serviço cadastrado</span>'; return; }
   el.innerHTML = t.servicos.map((s,i)=>`
     <span class="serv-tag">
-      ${ETAPA_LABELS[s.etapa_id]||s.etapa_id}${s.desc?' · '+s.desc:''} · ${s.pares>1?s.pares+'×':''}R$ ${fmt2(s.valor)}${s.pares>1?'/par · R$ '+fmt2(s.valor*s.pares)+'/pç':'/pç'}
+      ${ETAPA_LABELS[s.etapa_id]||s.etapa_id}${s.desc?' · '+s.desc:''} · ${s.pares>1?s.pares+'×':''}R$ ${fmt2(s.valor)}${s.pares>1?'/par · R$ '+fmt2(s.valor*s.pares)+(s.etapa_id==='friso'?'/kg':'/pç'):(s.etapa_id==='friso'?'/kg':'/pç')}
       <button onclick="removerServico('${s.sid||i}')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;padding:0 0 0 4px;line-height:1">×</button>
     </span>`).join('');
 }
@@ -587,6 +587,9 @@ function calcularFechamento(tercIdx, mesAno){
           // Sem checklist: estimativa = min(body,calça) por tamanho
           total = tams.reduce((s,tam)=>s+Math.min(parseInt(op.grade?.[tam]||0),parseInt(opSec.grade?.[tam]||0)),0);
         }
+      } else if(etapa.tipo==='friso'){
+        // Friso é cobrado por quilo, não por peça — usa o peso retornado (kg) como quantidade
+        total = parseFloat(ck.peso_retornado)||0;
       }
       // Tentar identificar o serviço pelo campo e.servico registrado na OP
       const servicoNome = etapa.servico||'';
@@ -1179,6 +1182,10 @@ function calcularAProduzirTerc(tercIdx, mesAno){
       const opSec=ordens.find(x=>x.op_vinculada===op.cod);
       let total=gradeTotal;
       if(etapa.tipo==='revisao'&&opSec){const tams2=op.grade_tamanhos||[];total=tams2.reduce((s,tam)=>s+Math.min(parseInt(op.grade?.[tam]||0),parseInt(opSec.grade?.[tam]||0)),0);}
+      else if(etapa.tipo==='friso'){
+        // Estimativa: usa o peso retornado se já preenchido, senão o peso enviado
+        total = parseFloat(etapa.ck?.peso_retornado)||parseFloat(etapa.ck?.peso_enviado)||0;
+      }
       const s1=findServPorTipo(t.servicos, op.tipo_peca||'conjunto', etapa.id)||servicos[0];
       const codVincAP = (etapa.id==='rev'||etapa.id==='conf') && opSec ? opSec.cod : null;
       if(s1) linhas.push({cod:op.cod,codVinc:codVincAP,produto:op.produto,etapa:ETAPA_LABELS[etapa.id]||etapa.id,desc:'',data:etapa.data_retorno_real,qtd:total,pares:s1.pares||1,vUnit:s1.valor*(s1.pares||1),valor:total*(s1.valor||0)*(s1.pares||1),status:etapa.status});
@@ -1489,6 +1496,7 @@ function renderPorOrdem(){
       const t2=tams.reduce((s,t)=>s+(parseInt(ck['emb_'+t])||0),0);
       if(t2>0) total=t2; else total=gradeRef;
     }
+    else if(e.tipo==='friso'){ total = parseFloat(ck.peso_retornado)||parseFloat(ck.peso_enviado)||0; }
     return total;
   }
 
@@ -1540,7 +1548,7 @@ function renderPorOrdem(){
         return '<div class="op-row">'
           +'<span style="color:var(--ch2)">'+(ETAPA_LABELS[l.e.id]||l.e.id)+'</span>'
           +'<span style="'+(l.temCk?'':'color:var(--fe);font-style:italic')+'">'
-          +l.qtd+' pç'+(l.temCk?'':' (estimado)')+' x R$ '+fmt2((l.serv&&l.serv.valor||0)*(l.serv&&l.serv.pares||1))
+          +l.qtd+(l.e.tipo==='friso'?' kg':' pç')+(l.temCk?'':' (estimado)')+' x R$ '+fmt2((l.serv&&l.serv.valor||0)*(l.serv&&l.serv.pares||1))
           +' = <strong>R$ '+fmt2(l.val)+'</strong></span>'
           +'</div>';
       }).join('')
@@ -1607,7 +1615,7 @@ function imprimirFechamento(){
       <table class="pr-table">
         <thead><tr>
           <th>Ordem</th><th>Produto</th><th>Etapa</th>
-          <th>Data entrega</th><th class="c">Qtd</th><th class="c">R$/pç</th><th class="c">Total</th>
+          <th>Data entrega</th><th class="c">Qtd</th><th class="c">R$/un.</th><th class="c">Total</th>
         </tr></thead>
         <tbody>
           ${linhas.map(l=>`<tr>

@@ -453,6 +453,36 @@ function ehRomper(o){ return o.tipo_peca==='romper'; }
 function ehSuperior(o){ return o.tipo_peca==='body'||o.tipo_peca==='romper'||o.tipo_peca==='ciclista'; }
 function ehInferior(o){ return o.tipo_peca==='calca'||o.tipo_peca==='bermuda'; }
 
+// Ao digitar a quantidade que saiu da Costura, preenche automaticamente o campo
+// "Saiu da costura" nas etapas seguintes que têm esse campo (Botão e Revisão/Embalagem)
+function propagarSaiuCostura(eiCostura, tam){
+  const o = ordens[ordemAtiva];
+  if(!o) return;
+  const ckCostura = o.etapas[eiCostura].ck||{};
+  const conj = ehConjunto(o);
+  const sup  = ehSuperior(o);
+  const valBody  = parseInt(ckCostura[`body_${tam}`])||0;
+  const valShort = parseInt(ckCostura[`short_${tam}`])||0;
+  const valUnico = sup ? valBody : valShort; // quando a OP não é conjunto (peça única)
+
+  o.etapas.forEach((e, ei2) => {
+    if(ei2===eiCostura) return;
+    if(e.tipo!=='botao' && e.tipo!=='revisao') return;
+    if(!e.ck) e.ck = {};
+    e.ck[`scos_${tam}`] = conj ? valBody : valUnico;
+    if(e.tipo==='revisao' && conj) e.ck[`scosb_${tam}`] = valShort;
+
+    const inp = document.getElementById(`scos-${ei2}-${tam}`);
+    if(inp) inp.value = e.ck[`scos_${tam}`]||'';
+    if(e.tipo==='revisao' && conj){
+      const inpB = document.getElementById(`scosb-${ei2}-${tam}`);
+      if(inpB) inpB.value = e.ck[`scosb_${tam}`]||'';
+    }
+    atualizarTotalCk(ei2);
+  });
+  saveOrdens(ordens);
+}
+
 // ── NOVA ORDEM ────────────────────────────────────────────────────────────────
 async function novaOrdem(){
   const cod = await nextSeq();
@@ -816,18 +846,18 @@ function renderCkCostura(ei){
       const conjCell = b||s2 ? `<td class="td-total" id="ck-conj-${ei}-${t}" style="background:var(--gn2);font-weight:700">${cj||''}</td><td class="td-total" id="ck-sbb-${ei}-${t}" style="color:var(--am);font-weight:600">${sbB||''}</td><td class="td-total" id="ck-sbs-${ei}-${t}" style="color:var(--am);font-weight:600">${sbS||''}</td>` : `<td id="ck-conj-${ei}-${t}"></td><td id="ck-sbb-${ei}-${t}"></td><td id="ck-sbs-${ei}-${t}"></td>`;
       return `<tr>
         <td class="td-tam">${t}</td>${ref}
-        <td><input type="number" min="0" value="${ck[`body_${t}`]||''}" oninput="salvarCk(${ei},'body_${t}',this.value);atualizarTotalCk(${ei})"/></td>
-        <td><input type="number" min="0" value="${ck[`short_${t}`]||''}" oninput="salvarCk(${ei},'short_${t}',this.value);atualizarTotalCk(${ei})"/></td>
+        <td><input type="number" min="0" value="${ck[`body_${t}`]||''}" oninput="salvarCk(${ei},'body_${t}',this.value);atualizarTotalCk(${ei});propagarSaiuCostura(${ei},'${t}')"/></td>
+        <td><input type="number" min="0" value="${ck[`short_${t}`]||''}" oninput="salvarCk(${ei},'short_${t}',this.value);atualizarTotalCk(${ei});propagarSaiuCostura(${ei},'${t}')"/></td>
         ${conjCell}
       </tr>`;
     }
     if(sup) return `<tr>
       <td class="td-tam">${t}</td>${ref}
-      <td><input type="number" min="0" value="${ck[`body_${t}`]||''}" oninput="salvarCk(${ei},'body_${t}',this.value);atualizarTotalCk(${ei})"/></td>
+      <td><input type="number" min="0" value="${ck[`body_${t}`]||''}" oninput="salvarCk(${ei},'body_${t}',this.value);atualizarTotalCk(${ei});propagarSaiuCostura(${ei},'${t}')"/></td>
     </tr>`;
     return `<tr>
       <td class="td-tam">${t}</td>${ref}
-      <td><input type="number" min="0" value="${ck[`short_${t}`]||''}" oninput="salvarCk(${ei},'short_${t}',this.value);atualizarTotalCk(${ei})"/></td>
+      <td><input type="number" min="0" value="${ck[`short_${t}`]||''}" oninput="salvarCk(${ei},'short_${t}',this.value);atualizarTotalCk(${ei});propagarSaiuCostura(${ei},'${t}')"/></td>
     </tr>`;
   }).join('');
 
@@ -886,7 +916,7 @@ function renderCkBotao(ei){
 
   const rows = tams.map(t => `<tr>
     <td class="td-tam">${t}</td>
-    <td><input type="number" min="0" value="${ck[`scos_${t}`]||''}" oninput="salvarCk(${ei},'scos_${t}',this.value);atualizarTotalCk(${ei})"/></td>
+    <td><input type="number" min="0" id="scos-${ei}-${t}" value="${ck[`scos_${t}`]||''}" oninput="salvarCk(${ei},'scos_${t}',this.value);atualizarTotalCk(${ei})"/></td>
     <td><input type="number" min="0" value="${ck[`botb_${t}`]||''}" oninput="salvarCk(${ei},'botb_${t}',this.value);atualizarTotalCk(${ei})"/></td>
   </tr>`).join('');
 
@@ -930,8 +960,8 @@ function renderCkRevisao(ei){
       const fconj  = Math.min(fbody, fcalca);
       return '<tr>'
         +'<td class="td-tam">'+t+'</td>'
-        +'<td><input type="number" min="0" value="'+(ck['scos_'+t]||'')+'" oninput="salvarCk('+ei+',\'scos_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
-        +'<td><input type="number" min="0" value="'+(ck['scosb_'+t]||'')+'" oninput="salvarCk('+ei+',\'scosb_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
+        +'<td><input type="number" min="0" id="scos-'+ei+'-'+t+'" value="'+(ck['scos_'+t]||'')+'" oninput="salvarCk('+ei+',\'scos_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
+        +'<td><input type="number" min="0" id="scosb-'+ei+'-'+t+'" value="'+(ck['scosb_'+t]||'')+'" oninput="salvarCk('+ei+',\'scosb_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
         +'<td><input type="number" min="0" value="'+(ck['emb_'+t]||'')+'" oninput="salvarCk('+ei+',\'emb_'+t+'\',this.value);atualizarTotalCk('+ei+')" style="background:var(--gn2);font-weight:600"/></td>'
         +'<td><input type="number" min="0" value="'+(ck['fuchi_'+t]||'')+'" oninput="salvarCk('+ei+',\'fuchi_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
         +'<td><input type="number" min="0" value="'+(ck['fuchib_'+t]||'')+'" oninput="salvarCk('+ei+',\'fuchib_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
@@ -944,7 +974,7 @@ function renderCkRevisao(ei){
     }
     return '<tr>'
       +'<td class="td-tam">'+t+'</td>'
-      +'<td><input type="number" min="0" value="'+(ck['scos_'+t]||'')+'" oninput="salvarCk('+ei+',\'scos_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
+      +'<td><input type="number" min="0" id="scos-'+ei+'-'+t+'" value="'+(ck['scos_'+t]||'')+'" oninput="salvarCk('+ei+',\'scos_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
       +'<td><input type="number" min="0" value="'+(ck['emb_'+t]||'')+'" oninput="salvarCk('+ei+',\'emb_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
       +'<td><input type="number" min="0" value="'+(ck['fuchi_'+t]||'')+'" oninput="salvarCk('+ei+',\'fuchi_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'
       +'<td><input type="number" min="0" value="'+(ck['dq_'+t]||'')+'" oninput="salvarCk('+ei+',\'dq_'+t+'\',this.value);atualizarTotalCk('+ei+')"/></td>'

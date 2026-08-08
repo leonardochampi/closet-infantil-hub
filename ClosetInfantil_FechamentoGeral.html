@@ -352,6 +352,10 @@ function calcularTotalTerceirizado(tercIdx, mesAno){
       else if(etapa.tipo==='costura'){const ehConj=(op.tipo_peca||'conjunto')==='conjunto';const ehSup=op.tipo_peca==='body'||op.tipo_peca==='romper'||op.tipo_peca==='ciclista';if(ehConj){const tb=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);const ts=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);if(tb||ts){const conjuntos=tams.reduce((s,t)=>s+Math.min(parseInt(ck['body_'+t])||0,parseInt(ck['short_'+t])||0),0);etapa._sobraBody=tb-conjuntos;etapa._sobraShort=ts-conjuntos;total=conjuntos;}}else if(ehSup){const t2=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);if(t2>0)total=t2;}else{const t2=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);if(t2>0)total=t2;}}
       else if(etapa.tipo==='botao'){const t2=tams.reduce((s,t)=>s+(parseInt(ck['botb_'+t])||0),0);if(t2>0)total=t2;}
       else if(etapa.tipo==='revisao'){const tEmb=tams.reduce((s,t)=>s+(parseInt(ck['emb_'+t])||0),0);if(tEmb>0){total=tEmb;}else{const opSec=ordens.find(x=>x.op_vinculada===op.cod);if(opSec)total=tams.reduce((s,t)=>s+Math.min(parseInt(op.grade?.[t]||0),parseInt(opSec.grade?.[t]||0)),0);}}
+      else if(etapa.tipo==='friso'){
+        // Friso é cobrado por quilo, não por peça — usa o peso retornado (kg) como quantidade
+        total = parseFloat(ck.peso_retornado)||0;
+      }
       const servicoNome=etapa.servico||'';
       const sMatch=servicos.find(s=>servicoNome&&(s.desc||'').toLowerCase()===servicoNome.toLowerCase());
       const s1=sMatch||findServPorTipo(t.servicos,op.tipo_peca||'conjunto',etapa.id)||(servicos.length===1?servicos[0]:null);
@@ -423,6 +427,9 @@ function calcularAProduzir(tercIdx, mesAno){
       if(etapa.tipo==='revisao'&&opSec){
         const tams2=op.grade_tamanhos||[];
         total=tams2.reduce((s,t)=>s+Math.min(parseInt(op.grade?.[t]||0),parseInt(opSec.grade?.[t]||0)),0);
+      } else if(etapa.tipo==='friso'){
+        // Friso é cobrado por quilo — usa o peso retornado se já preenchido, senão o enviado
+        total = parseFloat(etapa.ck?.peso_retornado)||parseFloat(etapa.ck?.peso_enviado)||0;
       }
       const s1=findServPorTipo(t.servicos,op.tipo_peca||'conjunto',etapa.id)||servicos[0];
       if(s1) linhas.push({etapa:ETAPA_LABELS[etapa.id]||etapa.id,cod:op.cod,produto:op.produto,qtd:total,vUnit:s1.valor*(s1.pares||1),valor:total*(s1.valor||0)*(s1.pares||1),status:etapa.status||'aguardando'});

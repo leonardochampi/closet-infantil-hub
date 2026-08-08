@@ -876,9 +876,9 @@ function renderCkCostura(ei){
     inferior: `<th class="th-tam">Tam.</th><th class="th-ref">Cortado</th><th class="th-short">✓ Shorts/Calça costurado</th>`,
   };
   const foots = {
-    conjunto: `<td class="td-tam">Total</td><td class="td-total">${totalRef}</td><td id="ck-total-body-${ei}"></td><td id="ck-total-short-${ei}"></td><td class="td-total" style="background:var(--gn2);font-weight:700;color:var(--gn)" id="ck-total-conj-${ei}"></td><td class="td-total" style="color:var(--am);font-weight:600" id="ck-total-sbb-${ei}"></td><td class="td-total" style="color:var(--am);font-weight:600" id="ck-total-sbs-${ei}"></td>`,
-    superior: `<td class="td-tam">Total</td><td class="td-total">${totalRef}</td><td id="ck-total-body-${ei}"></td>`,
-    inferior: `<td class="td-tam">Total</td><td class="td-total">${totalRef}</td><td id="ck-total-short-${ei}"></td>`,
+    conjunto: `<td class="td-tam">Total</td><td class="td-total ck-total-cortado">${totalRef}</td><td id="ck-total-body-${ei}"></td><td id="ck-total-short-${ei}"></td><td class="td-total" style="background:var(--gn2);font-weight:700;color:var(--gn)" id="ck-total-conj-${ei}"></td><td class="td-total" style="color:var(--am);font-weight:600" id="ck-total-sbb-${ei}"></td><td class="td-total" style="color:var(--am);font-weight:600" id="ck-total-sbs-${ei}"></td>`,
+    superior: `<td class="td-tam">Total</td><td class="td-total ck-total-cortado">${totalRef}</td><td id="ck-total-body-${ei}"></td>`,
+    inferior: `<td class="td-tam">Total</td><td class="td-total ck-total-cortado">${totalRef}</td><td id="ck-total-short-${ei}"></td>`,
   };
 
   return `<div class="section-label" style="margin-top:12px">Controle de peças <span style="font-size:10px;color:var(--fe);font-weight:400">(referência: composição da grade)</span></div>

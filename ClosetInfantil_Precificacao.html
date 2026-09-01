@@ -657,10 +657,10 @@ function getFreteProd(){
 
 // ── COMMISSION LOGIC ────────────────────────────────────────────────────────
 function mlTaxaFixa(preco){
-  if(preco <= 28.99) return 6.25;
-  if(preco <= 50.00) return 6.50;
-  if(preco <= 79.00) return 6.75;
-  return 0; // acima de R$79 só taxa percentual
+  // Desde mar/2026 o ML trocou a taxa fixa por faixa de preço por um custo variável
+  // por peso/dimensão. Por decisão do Leonardo, esse custo é absorvido dentro do
+  // campo "Frete" preenchido manualmente por produto — não soma aqui pra evitar contar 2x.
+  return 0;
 }
 function shopeeComissao(preco){
   // Faixas atualizadas março/2026 — sem desconto PIX (cenário pessimista)
@@ -839,7 +839,7 @@ function calc(){
   const items = [
     {l:'Preço de venda',          v:preco,         neg:false},
     {l:'(-) Custo do produto',    v:-custo,         neg:true},
-    {l: ch==='ml' ? '(-) Frete + taxa fixa ML' : '(-) Frete fixo Shein', v:-frete, neg:true, skip: ch==='shopee'},
+    {l: ch==='ml' ? '(-) Frete ML' : '(-) Frete fixo Shein', v: ch==='ml' ? -(frete+taxa) : -frete, neg:true, skip: ch==='shopee'},
     {l:'(-) Embalagem + etiqueta',v:-emb,           neg:true},
     {l:'(-) Imposto + Desp. fixas',     v:-imp,           neg:true},
     {l:'(-) Comissão '+chLabel+(ch==='shopee'?' ('+((shopeeComissao(preco).pct)*100).toFixed(0)+'%)':''),   v:-com,           neg:true},

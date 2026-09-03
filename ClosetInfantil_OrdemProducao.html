@@ -1835,9 +1835,13 @@ function removerNF(ni){
 function renderRetornosParciais(ei, retornos){
   const o = ordens[ordemAtiva];
   const tams = o.grade_tamanhos||[];
+  const conj = ehConjunto(o);
   if(!retornos.length) return '<div style="font-size:11px;color:var(--fe2);font-style:italic;padding:4px 0">Nenhum retorno registrado.</div>';
   return retornos.map((r,ri)=>{
     const qtdTot = tams.reduce((s,t)=>s+(parseInt(r.qtd_tam?.[t]||0)),0);
+    const peca = r.peca||'ambos';
+    const pillCss = (ativo) => `padding:6px 16px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif;${ativo?'font-weight:700;background:var(--ch);color:var(--pa)':'color:var(--ch2)'}`;
+    const legendas = {body:'↳ Vai contar só para o Body (Botão e Revisão)', calca:'↳ Vai contar só para a Calça (Revisão)', ambos:''};
     return `
     <div style="background:var(--pa2);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
@@ -1854,6 +1858,15 @@ function renderRetornosParciais(ei, retornos){
         </div>
         <button onclick="removerRetornoParcial(${ei},${ri})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;padding-bottom:4px">×</button>
       </div>
+      ${conj?`
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;display:block;margin-bottom:5px;color:var(--ch2)">Peça entregue</label>
+        <div style="display:inline-flex;border:1.5px solid var(--fe2);border-radius:20px;overflow:hidden">
+          <div style="${pillCss(peca==='body')}" onclick="salvarPecaRetorno(${ei},${ri},'body')">Body</div>
+          <div style="${pillCss(peca==='calca')};border-left:1.5px solid var(--fe2)" onclick="salvarPecaRetorno(${ei},${ri},'calca')">Calça</div>
+          <div style="${pillCss(peca==='ambos')};border-left:1.5px solid var(--fe2)" onclick="salvarPecaRetorno(${ei},${ri},'ambos')">Ambos</div>
+        </div>
+      </div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${tams.map(t=>`
           <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px">
@@ -1863,6 +1876,7 @@ function renderRetornosParciais(ei, retornos){
               style="width:52px;padding:5px 6px;font-size:12px;text-align:center;border:1.5px solid var(--fe2);border-radius:var(--r-sm);font-family:'Poppins',sans-serif"/>
           </div>`).join('')}
       </div>
+      ${conj&&legendas[peca]?`<div style="margin-top:8px;font-size:11px;color:var(--am);font-weight:600">${legendas[peca]}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -1882,7 +1896,16 @@ function renderMesSelectParcial(ei, ri, mesSel){
 function adicionarRetornoParcial(ei){
   const o = ordens[ordemAtiva];
   if(!o.etapas[ei].retornos_parciais) o.etapas[ei].retornos_parciais = [];
-  o.etapas[ei].retornos_parciais.push({data:'', mes:'', qtd_tam:{}, qtd:0});
+  o.etapas[ei].retornos_parciais.push({data:'', mes:'', qtd_tam:{}, qtd:0, peca:'ambos'});
+  saveOrdens(ordens);
+  const wrap = document.getElementById('retornos-wrap-'+ei);
+  if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);
+}
+
+function salvarPecaRetorno(ei, ri, peca){
+  const o = ordens[ordemAtiva];
+  if(!o.etapas[ei].retornos_parciais) return;
+  o.etapas[ei].retornos_parciais[ri].peca = peca;
   saveOrdens(ordens);
   const wrap = document.getElementById('retornos-wrap-'+ei);
   if(wrap) wrap.innerHTML = renderRetornosParciais(ei, o.etapas[ei].retornos_parciais);

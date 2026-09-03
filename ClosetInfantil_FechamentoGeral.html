@@ -245,10 +245,11 @@ function findServPorTipo(servicos, tipoPeca, etapaId){
   return servs.length===1 ? servs[0] : servs[0];
 }
 // Helper: soma retornos parciais de uma etapa num mês específico
-function somaRetornosParciais(etapa, mesAno){
+function somaRetornosParciais(etapa, mesAno, peca){
   const rp = etapa.retornos_parciais||[];
   if(!rp.length) return null; // sem retornos parciais, usar lógica normal
-  const soma = rp.filter(r=>r.mes===mesAno).reduce((s,r)=>s+(parseInt(r.qtd)||0),0);
+  const soma = rp.filter(r=>r.mes===mesAno && (!peca || !r.peca || r.peca==='ambos' || r.peca===peca))
+                 .reduce((s,r)=>s+(parseInt(r.qtd)||0),0);
   return soma > 0 ? soma : null;
 }
 function nomeMatch(fornecedor, nomeTerc){
@@ -349,7 +350,7 @@ function calcularTotalTerceirizado(tercIdx, mesAno){
       const qtdParcial = somaRetornosParciais(etapa, mesAno);
       let total = qtdParcial !== null ? qtdParcial : gradeTotal;
       if(etapa.tipo==='estamparia'){const t2=tams.reduce((s,t)=>s+(parseInt(ck['est_'+t])||0),0);if(t2>0)total=t2;}
-      else if(etapa.tipo==='costura'){const ehConj=(op.tipo_peca||'conjunto')==='conjunto';const ehSup=op.tipo_peca==='body'||op.tipo_peca==='romper'||op.tipo_peca==='ciclista';if(ehConj){const tb=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);const ts=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);if(tb||ts){const conjuntos=tams.reduce((s,t)=>s+Math.min(parseInt(ck['body_'+t])||0,parseInt(ck['short_'+t])||0),0);etapa._sobraBody=tb-conjuntos;etapa._sobraShort=ts-conjuntos;total=conjuntos;}}else if(ehSup){const t2=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);if(t2>0)total=t2;}else{const t2=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);if(t2>0)total=t2;}}
+      else if(etapa.tipo==='costura'){const ehConj=(op.tipo_peca||'conjunto')==='conjunto';const ehSup=op.tipo_peca==='body'||op.tipo_peca==='romper'||op.tipo_peca==='ciclista';if(ehConj){const qtdBP=somaRetornosParciais(etapa,mesAno,'body');const qtdCP=somaRetornosParciais(etapa,mesAno,'calca');let tb,ts,conjuntos;if(qtdBP!==null||qtdCP!==null){tb=qtdBP||0;ts=qtdCP||0;conjuntos=Math.min(tb,ts);}else{tb=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);ts=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);conjuntos=tams.reduce((s,t)=>s+Math.min(parseInt(ck['body_'+t])||0,parseInt(ck['short_'+t])||0),0);}if(tb||ts){etapa._sobraBody=tb-conjuntos;etapa._sobraShort=ts-conjuntos;total=conjuntos;}}else if(ehSup){const t2=tams.reduce((s,t)=>s+(parseInt(ck['body_'+t])||0),0);if(t2>0)total=t2;}else{const t2=tams.reduce((s,t)=>s+(parseInt(ck['short_'+t])||0),0);if(t2>0)total=t2;}}
       else if(etapa.tipo==='botao'){const t2=tams.reduce((s,t)=>s+(parseInt(ck['botb_'+t])||0),0);if(t2>0)total=t2;}
       else if(etapa.tipo==='revisao'){const tEmb=tams.reduce((s,t)=>s+(parseInt(ck['emb_'+t])||0),0);if(tEmb>0){total=tEmb;}else{const opSec=ordens.find(x=>x.op_vinculada===op.cod);if(opSec)total=tams.reduce((s,t)=>s+Math.min(parseInt(op.grade?.[t]||0),parseInt(opSec.grade?.[t]||0)),0);}}
       else if(etapa.tipo==='friso'){

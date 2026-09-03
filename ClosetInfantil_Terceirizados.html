@@ -287,10 +287,11 @@ function findServPorTipo(servicos, tipoPeca, etapaId){
   return servs.length===1 ? servs[0] : servs[0];
 }
 // Helper: soma retornos parciais de uma etapa num mês específico
-function somaRetornosParciais(etapa, mesAno){
+function somaRetornosParciais(etapa, mesAno, peca){
   const rp = etapa.retornos_parciais||[];
   if(!rp.length) return null; // sem retornos parciais, usar lógica normal
-  const soma = rp.filter(r=>r.mes===mesAno).reduce((s,r)=>s+(parseInt(r.qtd)||0),0);
+  const soma = rp.filter(r=>r.mes===mesAno && (!peca || !r.peca || r.peca==='ambos' || r.peca===peca))
+                 .reduce((s,r)=>s+(parseInt(r.qtd)||0),0);
   return soma > 0 ? soma : null;
 }
 function formatarTelefone(v){
@@ -560,10 +561,21 @@ function calcularFechamento(tercIdx, mesAno){
         const ehConj = (op.tipo_peca||'conjunto')==='conjunto';
         const ehSup  = op.tipo_peca==='body'||op.tipo_peca==='romper'||op.tipo_peca==='ciclista';
         if(ehConj){
-          const tb = tams.reduce((s,tam)=>s+(parseInt(ck['body_'+tam])||0),0);
-          const ts = tams.reduce((s,tam)=>s+(parseInt(ck['short_'+tam])||0),0);
+          // Se há retornos parciais marcados por peça neste mês, usar eles (permite
+          // costureira entregar body e calça em meses/momentos diferentes)
+          const qtdBodyParcial = somaRetornosParciais(etapa, mesAno, 'body');
+          const qtdCalcaParcial = somaRetornosParciais(etapa, mesAno, 'calca');
+          let tb, ts, conjuntos;
+          if(qtdBodyParcial!==null || qtdCalcaParcial!==null){
+            tb = qtdBodyParcial||0;
+            ts = qtdCalcaParcial||0;
+            conjuntos = Math.min(tb,ts);
+          } else {
+            tb = tams.reduce((s,tam)=>s+(parseInt(ck['body_'+tam])||0),0);
+            ts = tams.reduce((s,tam)=>s+(parseInt(ck['short_'+tam])||0),0);
+            conjuntos = tams.reduce((s,tam)=>s+Math.min(parseInt(ck['body_'+tam])||0,parseInt(ck['short_'+tam])||0),0);
+          }
           if(tb||ts){
-            const conjuntos = tams.reduce((s,tam)=>s+Math.min(parseInt(ck['body_'+tam])||0,parseInt(ck['short_'+tam])||0),0);
             etapa._sobraBody  = tb - conjuntos;
             etapa._sobraShort = ts - conjuntos;
             total = conjuntos;

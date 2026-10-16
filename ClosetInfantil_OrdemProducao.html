@@ -1630,27 +1630,27 @@ function prepararImpressao(){
     const tipo = e.tipo;
     let head='', rows='', foot='';
     if(tipo==='estamparia'){
-      head=`<th class="th-tam">Tam.</th><th>Cortado</th><th class="th-check">✓ Estampado</th><th class="th-ret">Retalho</th>`;
-      rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${o.grade[t]||0}</td><td>${ck[`est_${t}`]||''}</td><td>${ck[`ret_${t}`]||''}</td></tr>`).join('');
+      head=`<th class="th-tam">Tam.</th><th class="th-check">✓ Estampado</th><th class="th-ret">Retalho</th>`;
+      rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${ck[`est_${t}`]||''}</td><td>${ck[`ret_${t}`]||''}</td></tr>`).join('');
       const te=tams.reduce((s,t)=>s+(ck[`est_${t}`]||0),0), tr=tams.reduce((s,t)=>s+(ck[`ret_${t}`]||0),0);
-      foot=`<td class="td-tam">Total</td><td>${total}</td><td>${te||''}</td><td>${tr||''}</td>`;
+      foot=`<td class="td-tam">Total</td><td>${te||''}</td><td>${tr||''}</td>`;
     } else if(tipo==='friso'){
       return `<table class="pr-ck-table"><thead><tr><th>Peso enviado (kg)</th><th>Peso retornado (kg)</th></tr></thead>
         <tbody><tr><td>${ck.peso_enviado?parseFloat(ck.peso_enviado).toFixed(2):''}</td><td>${ck.peso_retornado?parseFloat(ck.peso_retornado).toFixed(2):''}</td></tr></tbody></table>`;
     } else if(tipo==='costura'){
       if(conj){
-        head=`<th class="th-tam">Tam.</th><th>Cortado</th><th class="th-body">✓ Body</th><th class="th-short">✓ Shorts/Calça</th>`;
-        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${o.grade[t]||0}</td><td>${ck[`body_${t}`]||''}</td><td>${ck[`short_${t}`]||''}</td></tr>`).join('');
+        head=`<th class="th-tam">Tam.</th><th class="th-body">✓ Body</th><th class="th-short">✓ Shorts/Calça</th>`;
+        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${ck[`body_${t}`]||''}</td><td>${ck[`short_${t}`]||''}</td></tr>`).join('');
         const tb=tams.reduce((s,t)=>s+(ck[`body_${t}`]||0),0), ts=tams.reduce((s,t)=>s+(ck[`short_${t}`]||0),0);
-        foot=`<td class="td-tam">Total</td><td>${total}</td><td>${tb||''}</td><td>${ts||''}</td>`;
+        foot=`<td class="td-tam">Total</td><td>${tb||''}</td><td>${ts||''}</td>`;
       } else {
         const ehSup = o.tipo_peca==='body'||o.tipo_peca==='romper'||o.tipo_peca==='ciclista';
         const labelCos = o.tipo_peca==='romper' ? '✓ Costurado' : o.tipo_peca==='ciclista' ? '✓ Costurado' : o.tipo_peca==='body' ? '✓ Costurado' : '✓ Costurado';
         const ckKey = ehSup ? (t=>`body_${t}`) : (t=>`short_${t}`);
-        head=`<th class="th-tam">Tam.</th><th>Cortado</th><th class="th-check">${labelCos}</th>`;
-        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${o.grade[t]||0}</td><td>${ck[ckKey(t)]||''}</td></tr>`).join('');
+        head=`<th class="th-tam">Tam.</th><th class="th-check">${labelCos}</th>`;
+        rows=tams.map(t=>`<tr><td class="td-tam">${t}</td><td>${ck[ckKey(t)]||''}</td></tr>`).join('');
         const tc=tams.reduce((s,t)=>s+(parseInt(ck[ckKey(t)])||0),0);
-        foot=`<td class="td-tam">Total</td><td>${total}</td><td>${tc||''}</td>`;
+        foot=`<td class="td-tam">Total</td><td>${tc||''}</td>`;
       }
     } else if(tipo==='conferencia'){
       const respNome = ck.conf_resp_nome||'';
@@ -1761,19 +1761,6 @@ function prepararImpressao(){
         <div class="pr-id-val">${fmtData(o.prazo)||'—'}</div>
       </div>
 
-    </div>
-    <div class="pr-section">
-      <div class="pr-section-title">Grade de produção</div>
-      <table class="pr-ck-table">
-        <thead><tr>
-          ${tams.map(t=>`<th>${t}</th>`).join('')}
-          <th style="background:#F2E4C9;font-weight:700">Total</th>
-        </tr></thead>
-        <tbody><tr>
-          ${tams.map(t=>`<td style="font-weight:600">${o.grade[t]||0}</td>`).join('')}
-          <td style="font-weight:700;background:#F2E4C9">${total}</td>
-        </tr></tbody>
-      </table>
     </div>
     <div class="pr-section">
       <div class="pr-section-title">Etapas de produção</div>

@@ -148,7 +148,7 @@ footer{text-align:center;margin-top:40px;font-size:11px;color:var(--fe);font-fam
   .pr-logo img{height:40px;width:auto}
   .pr-title{font-family:'Fraunces',serif;font-size:16pt;font-weight:600;color:#4A3524;line-height:1;text-align:right}
   .pr-sub{font-size:7pt;color:#6B4F38;margin-top:2px;text-align:right}
-  .pr-id-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+  .pr-id-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px}
   .pr-id-cell{border:1px solid #D4B898;border-radius:5px;padding:5px 8px}
   .pr-id-label{font-size:6.5pt;font-weight:700;color:#B5916B;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
   .pr-id-val{font-size:9.5pt;font-weight:700;color:#4A3524}
@@ -1759,6 +1759,10 @@ function prepararImpressao(){
       <div class="pr-id-cell">
         <div class="pr-id-label">Prazo</div>
         <div class="pr-id-val">${fmtData(o.prazo)||'—'}</div>
+      </div>
+      <div class="pr-id-cell" style="background:#F2E4C9">
+        <div class="pr-id-label">Total talhado</div>
+        <div class="pr-id-val">${total} pç</div>
       </div>
 
     </div>
